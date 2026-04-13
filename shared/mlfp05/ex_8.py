@@ -3,21 +3,9 @@
 """
 Shared infrastructure for Exercise 8 — Reinforcement Learning.
 
-Common infrastructure used by all technique files:
-  - CartPole environment setup
-  - Reward plotting helpers
-  - ExperimentTracker / ModelRegistry setup
-  - Replay buffer and DQN network
-  - Evaluation utilities
-
-This file is PROVIDED to you — do not modify it.
-Import what you need in each technique file:
-
-    from helpers import (
-        make_cartpole, setup_engines, ReplayBuffer, DQN,
-        evaluate_policy, moving_average, plot_reward_curve,
-        register_rl_model, device, OUTPUT_DIR,
-    )
+Contains: CartPole setup, reward plotting helpers, ExperimentTracker/ModelRegistry
+setup, custom environment base class, evaluation utilities.
+Technique-specific code does NOT belong here.
 """
 from __future__ import annotations
 
@@ -41,22 +29,7 @@ from kailash_ml import ModelVisualizer
 from kailash_ml.engines.experiment_tracker import ExperimentTracker
 from kailash_ml.engines.model_registry import ModelRegistry
 
-# Colab-adapted: inline helpers (shared module not available)
-import os
-from dotenv import load_dotenv
-
-def setup_environment():
-    """Set up environment for Colab."""
-    load_dotenv()
-
-def get_device():
-    """Return the best available device."""
-    import torch
-    if torch.cuda.is_available():
-        return torch.device('cuda')
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return torch.device('mps')
-    return torch.device('cpu')
+from shared.kailash_helpers import get_device, setup_environment
 
 # ════════════════════════════════════════════════════════════════════════
 # ENVIRONMENT SETUP
@@ -76,6 +49,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # CARTPOLE ENVIRONMENT
 # ════════════════════════════════════════════════════════════════════════
 
+
 def make_cartpole() -> tuple[gym.Env, int, int]:
     """Create CartPole-v1 and return (env, obs_dim, n_actions)."""
     env = gym.make("CartPole-v1")
@@ -84,9 +58,11 @@ def make_cartpole() -> tuple[gym.Env, int, int]:
     print(f"CartPole-v1  obs_dim={obs_dim}  n_actions={n_actions}")
     return env, obs_dim, n_actions
 
+
 # ════════════════════════════════════════════════════════════════════════
 # KAILASH ENGINE SETUP
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _setup_engines():
     conn = ConnectionManager("sqlite:///mlfp05_rl.db")
@@ -108,13 +84,16 @@ async def _setup_engines():
 
     return conn, tracker, exp_name, registry, has_registry
 
+
 def setup_engines() -> tuple:
     """Synchronously set up kailash-ml engines."""
     return asyncio.run(_setup_engines())
 
+
 # ════════════════════════════════════════════════════════════════════════
 # REPLAY BUFFER — shared by DQN and custom env training
 # ════════════════════════════════════════════════════════════════════════
+
 
 class ReplayBuffer:
     """Fixed-size buffer storing (state, action, reward, next_state, done)."""
@@ -139,9 +118,11 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
+
 # ════════════════════════════════════════════════════════════════════════
 # DQN NETWORK — shared by DQN training and custom env training
 # ════════════════════════════════════════════════════════════════════════
+
 
 class DQN(nn.Module):
     """Deep Q-Network: maps state -> Q-value for each action."""
@@ -159,9 +140,11 @@ class DQN(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
+
 # ════════════════════════════════════════════════════════════════════════
 # EVALUATION UTILITY
 # ════════════════════════════════════════════════════════════════════════
+
 
 def evaluate_policy(env: gym.Env, policy_fn, n_episodes: int = 30) -> list[float]:
     """Evaluate a policy function over n_episodes. Returns list of total rewards."""
@@ -178,9 +161,11 @@ def evaluate_policy(env: gym.Env, policy_fn, n_episodes: int = 30) -> list[float
         eval_returns.append(total)
     return eval_returns
 
+
 # ════════════════════════════════════════════════════════════════════════
 # REWARD PLOTTING HELPERS
 # ════════════════════════════════════════════════════════════════════════
+
 
 def moving_average(xs: list[float], window: int = 10) -> list[float]:
     """Smooth a time series with a rolling mean."""
@@ -189,6 +174,7 @@ def moving_average(xs: list[float], window: int = 10) -> list[float]:
     arr = np.asarray(xs, dtype=np.float32)
     kernel = np.ones(window, dtype=np.float32) / window
     return list(np.convolve(arr, kernel, mode="valid"))
+
 
 def plot_reward_curve(
     viz: ModelVisualizer,
@@ -209,9 +195,11 @@ def plot_reward_curve(
     fig.write_html(str(out_path))
     print(f"  Saved: {out_path}")
 
+
 # ════════════════════════════════════════════════════════════════════════
 # MODEL REGISTRATION HELPER
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _register_rl_model(
     registry: ModelRegistry,
@@ -231,6 +219,7 @@ async def _register_rl_model(
     )
     print(f"  Registered {name}: version={version.version}")
     return version
+
 
 def register_rl_model(
     registry: ModelRegistry,

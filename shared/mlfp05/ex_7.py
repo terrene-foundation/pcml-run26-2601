@@ -52,7 +52,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # by 32x, so 32x32 would collapse to 1x1 before final pooling. 96x96
 # gives a 3x3 final feature map — enough spatial information to learn.
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data" / "mlfp05" / "cifar10"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -93,6 +93,7 @@ val_transform = T.Compose(
         T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
     ]
 )
+
 
 def load_cifar10() -> tuple[
     torchvision.datasets.CIFAR10,
@@ -135,9 +136,11 @@ def load_cifar10() -> tuple[
 
     return train_set, val_set, train_loader, val_loader
 
+
 # ════════════════════════════════════════════════════════════════════════
 # KAILASH ENGINE SETUP
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _setup_engines():
     conn = ConnectionManager("sqlite:///mlfp05_transfer.db")
@@ -159,6 +162,7 @@ async def _setup_engines():
 
     return conn, tracker, exp_name, registry, has_registry
 
+
 def init_engines() -> tuple[
     ConnectionManager,
     ExperimentTracker,
@@ -169,9 +173,11 @@ def init_engines() -> tuple[
     """Synchronously set up kailash-ml engines."""
     return asyncio.run(_setup_engines())
 
+
 # ════════════════════════════════════════════════════════════════════════
 # TRAINING HARNESS — shared by all technique files
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _train_model_async(
     model: nn.Module,
@@ -270,6 +276,7 @@ async def _train_model_async(
 
     return train_losses, val_accs, train_accs
 
+
 def train_model(
     model: nn.Module,
     name: str,
@@ -294,9 +301,11 @@ def train_model(
         )
     )
 
+
 # ════════════════════════════════════════════════════════════════════════
 # MODEL REGISTRATION
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _register_model(
     registry: ModelRegistry,
@@ -318,6 +327,7 @@ async def _register_model(
     print(f"  Registered {name}: version={version.version}, acc={val_acc:.3f}")
     return version
 
+
 def register_model(
     registry: ModelRegistry,
     name: str,
@@ -328,9 +338,11 @@ def register_model(
     """Sync wrapper for model registration."""
     return asyncio.run(_register_model(registry, name, model, val_acc, final_loss))
 
+
 # ════════════════════════════════════════════════════════════════════════
 # FEATURE EXTRACTION & VISUALISATION HELPERS
 # ════════════════════════════════════════════════════════════════════════
+
 
 def extract_features(
     model: nn.Module,
@@ -369,10 +381,12 @@ def extract_features(
     labels_np = np.concatenate(labels)[:max_samples]
     return features_np, labels_np
 
+
 def compute_tsne(features: np.ndarray, perplexity: int = 30) -> np.ndarray:
     """Run t-SNE dimensionality reduction to 2D."""
     tsne = TSNE(n_components=2, perplexity=perplexity, n_iter=500, random_state=42)
     return tsne.fit_transform(features)
+
 
 def cluster_quality(coords: np.ndarray, labels: np.ndarray) -> float:
     """Cluster quality: ratio of intra-class to inter-class distance (lower = better)."""
@@ -396,6 +410,7 @@ def cluster_quality(coords: np.ndarray, labels: np.ndarray) -> float:
     )
     avg_intra = np.mean(intra)
     return avg_intra / inter if inter > 0 else float("inf")
+
 
 def plot_tsne(
     coords: np.ndarray,
@@ -425,9 +440,11 @@ def plot_tsne(
     fig.write_html(str(output_path))
     print(f"  Saved: {output_path}")
 
+
 def create_visualizer() -> ModelVisualizer:
     """Return a configured ModelVisualizer instance."""
     return ModelVisualizer()
+
 
 def save_training_plots(
     viz: ModelVisualizer,
@@ -438,6 +455,7 @@ def save_training_plots(
     fig = viz.training_history(metrics=metrics, x_label="Epoch", y_label="Value")
     fig.write_html(str(output_path))
     print(f"  Saved: {output_path}")
+
 
 def count_params(model: nn.Module, trainable_only: bool = False) -> int:
     """Count parameters in a model."""

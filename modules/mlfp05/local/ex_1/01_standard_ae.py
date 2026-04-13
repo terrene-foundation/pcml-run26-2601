@@ -28,7 +28,7 @@ from __future__ import annotations
 import torch.nn as nn
 import torch.nn.functional as F
 
-from helpers import (
+from shared.mlfp05.ex_1 import (
     INPUT_DIM,
     EPOCHS,
     device,

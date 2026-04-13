@@ -53,7 +53,7 @@ import torchvision
 import torchvision.transforms as T
 from torch.utils.data import DataLoader, TensorDataset
 
-from helpers import (
+from shared.mlfp05.ex_2 import (
     ACCELERATOR,
     BATCH_SIZE,
     CIFAR_MEAN,

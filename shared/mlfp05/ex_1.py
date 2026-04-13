@@ -25,22 +25,7 @@ from kailash_ml import ModelVisualizer
 from kailash_ml.engines.experiment_tracker import ExperimentTracker
 from kailash_ml.engines.model_registry import ModelRegistry
 
-# Colab-adapted: inline helpers (shared module not available)
-import os
-from dotenv import load_dotenv
-
-def setup_environment():
-    """Set up environment for Colab."""
-    load_dotenv()
-
-def get_device():
-    """Return the best available device."""
-    import torch
-    if torch.cuda.is_available():
-        return torch.device('cuda')
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return torch.device('mps')
-    return torch.device('cpu')
+from shared.kailash_helpers import get_device, setup_environment
 
 # ════════════════════════════════════════════════════════════════════════
 # ENVIRONMENT SETUP
@@ -59,13 +44,14 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # DATA LOADING — Fashion-MNIST (full 60K)
 # ════════════════════════════════════════════════════════════════════════
 
-REPO_ROOT = Path(".")
+REPO_ROOT = Path.cwd()
 DATA_DIR = REPO_ROOT / "data" / "mlfp05" / "fashion_mnist"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 INPUT_DIM = 28 * 28
 LATENT_DIM = 16
 EPOCHS = 10
+
 
 def load_fashion_mnist() -> (
     tuple[
@@ -108,6 +94,7 @@ def load_fashion_mnist() -> (
 
     return X_flat, X_test_flat, X_img, X_test_img, flat_loader, img_loader
 
+
 def get_fashion_mnist_labels() -> tuple[torch.Tensor, torch.Tensor]:
     """Return train and test label tensors."""
     train_set = torchvision.datasets.FashionMNIST(
@@ -120,9 +107,11 @@ def get_fashion_mnist_labels() -> tuple[torch.Tensor, torch.Tensor]:
     test_labels = torch.tensor([test_set[i][1] for i in range(len(test_set))])
     return train_labels, test_labels
 
+
 # ════════════════════════════════════════════════════════════════════════
 # KAILASH ENGINE SETUP
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _setup_engines():
     conn = ConnectionManager("sqlite:///mlfp05_autoencoders.db")
@@ -144,13 +133,16 @@ async def _setup_engines():
 
     return conn, tracker, exp_name, registry, has_registry
 
+
 def setup_engines() -> tuple:
     """Synchronously set up kailash-ml engines."""
     return asyncio.run(_setup_engines())
 
+
 # ════════════════════════════════════════════════════════════════════════
 # VISUALISATION UTILITIES — "Seeing Is Believing"
 # ════════════════════════════════════════════════════════════════════════
+
 
 def show_reconstruction(model, test_data, title, n=10, is_conv=False):
     """Show original vs reconstructed images side by side."""
@@ -190,6 +182,7 @@ def show_reconstruction(model, test_data, title, n=10, is_conv=False):
     plt.show()
     print(f"  Saved: {fname}")
 
+
 def show_denoising_grid(model, clean_data, title, n=10, sigma=0.3):
     """3-row grid: original, noisy input, cleaned output."""
     model.eval()
@@ -216,6 +209,7 @@ def show_denoising_grid(model, clean_data, title, n=10, sigma=0.3):
     plt.savefig(fname, dpi=150, bbox_inches="tight")
     plt.show()
     print(f"  Saved: {fname}")
+
 
 def show_activation_sparsity(model, test_data, title="Sparse AE Activations"):
     """Histogram of hidden-layer activations showing sparsity."""
@@ -246,6 +240,7 @@ def show_activation_sparsity(model, test_data, title="Sparse AE Activations"):
     plt.savefig(fname, dpi=150, bbox_inches="tight")
     plt.show()
     print(f"  Saved: {fname}")
+
 
 def show_latent_interpolation(model, test_data, title, n_steps=10, is_conv=False):
     """Morph between two images via latent space interpolation."""
@@ -289,6 +284,7 @@ def show_latent_interpolation(model, test_data, title, n_steps=10, is_conv=False
     plt.show()
     print(f"  Saved: {fname}")
 
+
 def show_generated_samples(model, title="VAE Generated Samples", grid_size=8):
     """Grid of images sampled from the VAE's learned prior N(0, I)."""
     model.eval()
@@ -308,6 +304,7 @@ def show_generated_samples(model, title="VAE Generated Samples", grid_size=8):
     plt.savefig(fname, dpi=150, bbox_inches="tight")
     plt.show()
     print(f"  Saved: {fname}")
+
 
 def show_latent_traversal(
     model, test_data, title="VAE Latent Traversal", n_dims=5, n_steps=11
@@ -342,6 +339,7 @@ def show_latent_traversal(
     plt.show()
     print(f"  Saved: {fname}")
 
+
 def show_timeseries_reconstruction(model, test_data, title, n_series=4):
     """Overlay original vs reconstructed time series."""
     model.eval()
@@ -372,6 +370,7 @@ def show_timeseries_reconstruction(model, test_data, title, n_series=4):
     plt.show()
     print(f"  Saved: {fname}")
 
+
 # ════════════════════════════════════════════════════════════════════════
 # TRAINING LOOP — shared by all variants
 # ════════════════════════════════════════════════════════════════════════
@@ -379,6 +378,7 @@ def show_timeseries_reconstruction(model, test_data, title, n_series=4):
 # Collect results across variants (populated by train_variant)
 all_losses: dict[str, list[float]] = {}
 all_models: dict[str, nn.Module] = {}
+
 
 async def _train_variant_async(
     tracker: ExperimentTracker,
@@ -427,6 +427,7 @@ async def _train_variant_async(
 
     return losses
 
+
 def train_variant(
     tracker: ExperimentTracker,
     exp_name: str,
@@ -448,9 +449,11 @@ def train_variant(
     all_models[name] = model
     return losses
 
+
 # ════════════════════════════════════════════════════════════════════════
 # MODEL REGISTRATION
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _register_model(
     registry: ModelRegistry,
@@ -473,6 +476,7 @@ async def _register_model(
     )
     print(f"  Registered {name}: version={version.version}, loss={final_loss:.4f}")
     return version
+
 
 def register_model(
     registry: ModelRegistry, name: str, model: nn.Module, final_loss: float

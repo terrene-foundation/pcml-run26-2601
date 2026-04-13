@@ -36,7 +36,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from PIL import Image
 
-from helpers import (
+from shared.mlfp05.ex_1 import (
     LATENT_DIM,
     EPOCHS,
     OUTPUT_DIR,

@@ -48,7 +48,7 @@ import torch.nn.functional as F
 import gymnasium as gym
 import polars as pl
 
-from helpers import (
+from shared.mlfp05.ex_8 import (
     DQN,
     OUTPUT_DIR,
     ReplayBuffer,

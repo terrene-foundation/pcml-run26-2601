@@ -9,13 +9,6 @@ Common infrastructure used by all technique files:
   - ExperimentTracker / ModelRegistry setup
   - LightningModule wrapper for training
   - Visualisation helpers
-
-This file is PROVIDED to you — do not modify it.
-Import what you need in each technique file:
-
-    from helpers import (
-        load_cifar10, init_engines, train_model, create_visualizer, ...
-    )
 """
 from __future__ import annotations
 
@@ -48,7 +41,7 @@ np.random.seed(42)
 pl.seed_everything(42, workers=True)
 
 DEVICE = get_device()
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data" / "mlfp05" / "cifar10"
 ARTIFACT_DIR = Path(__file__).resolve().parent
 
@@ -73,6 +66,7 @@ CLASS_NAMES = [
 # Per-channel normalisation statistics (CIFAR-10 population)
 CIFAR_MEAN = torch.tensor([0.4914, 0.4822, 0.4465]).view(1, 3, 1, 1)
 CIFAR_STD = torch.tensor([0.2470, 0.2435, 0.2616]).view(1, 3, 1, 1)
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Data Loading
@@ -131,6 +125,7 @@ def load_cifar10() -> tuple[
     )
     return X_train, y_train, X_val, y_val, train_loader, val_loader
 
+
 # ═══════════════════════════════════════════════════════════════════════
 # Kailash Engine Setup
 # ═══════════════════════════════════════════════════════════════════════
@@ -165,6 +160,7 @@ async def setup_engines(db_name: str = "mlfp05_cnns.db") -> tuple[
 
     return conn, tracker, exp_name, registry, has_registry
 
+
 def init_engines(db_name: str = "mlfp05_cnns.db") -> tuple[
     ConnectionManager,
     ExperimentTracker,
@@ -174,6 +170,7 @@ def init_engines(db_name: str = "mlfp05_cnns.db") -> tuple[
 ]:
     """Sync wrapper for setup_engines."""
     return asyncio.run(setup_engines(db_name))
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Lightning Training Infrastructure
@@ -222,6 +219,7 @@ class LitCNN(pl.LightningModule):
     def configure_optimizers(self):
         return torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
+
 def get_precision_setting() -> str:
     """Detect whether mixed-precision training is beneficial."""
     if torch.cuda.is_available():
@@ -236,6 +234,7 @@ def get_precision_setting() -> str:
         print("  CPU detected -- using 32-bit precision")
     return "32"
 
+
 def get_accelerator() -> str:
     """Return the Lightning accelerator string for the current device."""
     if torch.cuda.is_available():
@@ -244,8 +243,10 @@ def get_accelerator() -> str:
         return "mps"
     return "cpu"
 
+
 PRECISION = get_precision_setting()
 ACCELERATOR = get_accelerator()
+
 
 async def train_model_async(
     model: nn.Module,
@@ -306,6 +307,7 @@ async def train_model_async(
     )
     return lit.train_losses, lit.val_accs
 
+
 def train_model(
     model: nn.Module,
     name: str,
@@ -329,6 +331,7 @@ def train_model(
             epochs,
         )
     )
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Model Registration
@@ -356,6 +359,7 @@ async def register_model_async(
     print(f"  Registered {name}: version={version.version}, acc={final_acc:.3f}")
     return version
 
+
 def register_model(
     registry: ModelRegistry,
     name: str,
@@ -369,12 +373,14 @@ def register_model(
         register_model_async(registry, name, model, final_loss, final_acc, epochs)
     )
 
+
 # ═══════════════════════════════════════════════════════════════════════
 # Visualisation Helpers
 # ═══════════════════════════════════════════════════════════════════════
 def create_visualizer() -> ModelVisualizer:
     """Return a configured ModelVisualizer instance."""
     return ModelVisualizer()
+
 
 def save_training_plots(
     viz: ModelVisualizer,
@@ -392,9 +398,11 @@ def save_training_plots(
     fig.write_html(str(output_path))
     print(f"  Saved plot: {output_path}")
 
+
 def count_parameters(model: nn.Module) -> int:
     """Count total trainable parameters in a model."""
     return sum(p.numel() for p in model.parameters())
+
 
 def denormalise_cifar(img_tensor: torch.Tensor) -> torch.Tensor:
     """Reverse CIFAR-10 normalisation for display.

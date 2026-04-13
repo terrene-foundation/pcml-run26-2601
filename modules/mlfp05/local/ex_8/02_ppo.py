@@ -48,7 +48,7 @@ from torch.distributions import Categorical
 import gymnasium as gym
 import polars as pl
 
-from helpers import (
+from shared.mlfp05.ex_8 import (
     OUTPUT_DIR,
     device,
     evaluate_policy,

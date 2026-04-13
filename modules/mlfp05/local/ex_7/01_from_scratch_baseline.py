@@ -27,7 +27,7 @@ import plotly.graph_objects as go
 import torch
 import torch.nn as nn
 
-from helpers import (
+from shared.mlfp05.ex_7 import (
     BATCH_SIZE,
     CLASS_NAMES,
     EPOCHS,

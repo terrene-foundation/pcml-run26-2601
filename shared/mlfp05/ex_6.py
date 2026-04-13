@@ -41,13 +41,14 @@ device = get_device()
 OUTPUT_DIR = Path("outputs") / "ex6_gnns"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data" / "mlfp05" / "cora"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # ════════════════════════════════════════════════════════════════════════
 # GRAPH DATA LOADING
 # ════════════════════════════════════════════════════════════════════════
+
 
 def load_cora() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, str, int]:
     """Cora — 2708 papers, 1433 bag-of-words features, 7 classes.
@@ -80,6 +81,7 @@ def load_cora() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, str, in
     n_classes = int(dataset.num_classes)
     return X_np, A_np, y_np, edge_index_np, "Cora", n_classes
 
+
 def load_karate() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, str, int]:
     """Zachary's Karate Club — 34 nodes, 78 edges, 2 factions."""
     import networkx as nx
@@ -97,6 +99,7 @@ def load_karate() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, str, 
     src, dst = np.where(A_np > 0)
     edge_index_np = np.stack([src, dst]).astype(np.int64)
     return X_np, A_np, labels, edge_index_np, "Karate Club", 2
+
 
 def load_graph_data() -> dict:
     """Load Cora (with Karate fallback) and return all graph tensors.
@@ -177,9 +180,11 @@ def load_graph_data() -> dict:
         "dataset_name": dataset_name,
     }
 
+
 # ════════════════════════════════════════════════════════════════════════
 # KAILASH ENGINE SETUP
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _setup_engines():
     conn = ConnectionManager("sqlite:///mlfp05_gnns.db")
@@ -201,13 +206,16 @@ async def _setup_engines():
 
     return conn, tracker, exp_name, registry, has_registry
 
+
 def setup_engines() -> tuple:
     """Synchronously set up kailash-ml engines."""
     return asyncio.run(_setup_engines())
 
+
 # ════════════════════════════════════════════════════════════════════════
 # TRAINING HARNESS
 # ════════════════════════════════════════════════════════════════════════
+
 
 def train_node_classifier(
     model: nn.Module,
@@ -240,6 +248,7 @@ def train_node_classifier(
             weight_decay,
         )
     )
+
 
 async def _train_node_classifier_async(
     model: nn.Module,
@@ -331,11 +340,13 @@ async def _train_node_classifier_async(
 
     return train_losses, val_accs, test_accs
 
+
 # ════════════════════════════════════════════════════════════════════════
 # VISUALISATION HELPERS
 # ════════════════════════════════════════════════════════════════════════
 
 viz = ModelVisualizer()
+
 
 def plot_training_curves(
     metrics_dict: dict[str, list[float]],
@@ -352,6 +363,7 @@ def plot_training_curves(
     filepath = OUTPUT_DIR / filename
     fig.write_html(str(filepath))
     print(f"  Saved: {filepath}")
+
 
 def plot_node_embeddings(
     embeddings: np.ndarray,
@@ -401,6 +413,7 @@ def plot_node_embeddings(
         print(f"    class {c}: {pretty}")
 
     return coords
+
 
 def plot_graph_with_embeddings(
     A_np: np.ndarray,
@@ -463,6 +476,7 @@ def plot_graph_with_embeddings(
     plt.close(fig)
     print(f"  Saved: {filepath}")
 
+
 def plot_attention_weights(
     alpha: np.ndarray,
     A_np: np.ndarray,
@@ -512,9 +526,11 @@ def plot_attention_weights(
     plt.close(fig)
     print(f"  Saved: {filepath}")
 
+
 # ════════════════════════════════════════════════════════════════════════
 # MODEL REGISTRATION HELPER
 # ════════════════════════════════════════════════════════════════════════
+
 
 async def _register_model(
     registry: ModelRegistry,
@@ -530,6 +546,7 @@ async def _register_model(
         metrics=metrics,
     )
     return version
+
 
 def register_model(
     registry: ModelRegistry,

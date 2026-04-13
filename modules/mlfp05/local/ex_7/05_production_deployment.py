@@ -35,7 +35,7 @@ import torchvision
 
 from kailash_ml import InferenceServer
 
-from helpers import (
+from shared.mlfp05.ex_7 import (
     BATCH_SIZE,
     CLASS_NAMES,
     EPOCHS,

@@ -31,7 +31,7 @@ import polars as pl
 import torch
 import torch.nn as nn
 
-from ex_3.helpers import (
+from shared.mlfp05.ex_3 import (
     CLIP,
     EPOCHS,
     FEATURES,

@@ -26,22 +26,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-# Colab-adapted: inline helpers (shared module not available)
-import os
-from dotenv import load_dotenv
-
-def setup_environment():
-    """Set up environment for Colab."""
-    load_dotenv()
-
-def get_device():
-    """Return the best available device."""
-    import torch
-    if torch.cuda.is_available():
-        return torch.device('cuda')
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return torch.device('mps')
-    return torch.device('cpu')
+from shared.kailash_helpers import get_device, setup_environment
 
 from kailash.db import ConnectionManager
 from kailash_ml import ModelVisualizer
@@ -49,7 +34,7 @@ from kailash_ml.engines.experiment_tracker import ExperimentTracker
 from kailash_ml.engines.model_registry import ModelRegistry
 
 # ── Constants ───────────────────────────────────────────────────────────
-REPO_ROOT = Path(".")
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data" / "mlfp05" / "stocks"
 OUTPUT_DIR = REPO_ROOT / "outputs" / "mlfp05" / "ex_3"
 

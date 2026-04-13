@@ -35,7 +35,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-from helpers import (
+from shared.mlfp05.ex_4 import (
     BERT_BATCH_SIZE,
     BERT_MAX_LEN,
     BERT_MODEL_NAME,

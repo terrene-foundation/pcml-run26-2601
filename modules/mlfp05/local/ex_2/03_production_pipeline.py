@@ -46,7 +46,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from helpers import (
+from shared.mlfp05.ex_2 import (
     BATCH_SIZE,
     CLASS_NAMES,
     DEVICE,

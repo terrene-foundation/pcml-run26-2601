@@ -29,7 +29,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from helpers import (
+from shared.mlfp05.ex_4 import (
     CLASS_NAMES,
     DEVICE,
     MAX_LEN,

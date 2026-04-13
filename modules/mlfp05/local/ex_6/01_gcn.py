@@ -24,7 +24,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from helpers import (
+from shared.mlfp05.ex_6 import (
     OUTPUT_DIR,
     device,
     load_graph_data,

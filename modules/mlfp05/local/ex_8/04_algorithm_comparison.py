@@ -47,7 +47,7 @@ import polars as pl
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from helpers import (
+from shared.mlfp05.ex_8 import (
     DQN,
     OUTPUT_DIR,
     ReplayBuffer,

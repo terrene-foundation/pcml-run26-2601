@@ -35,22 +35,7 @@ from kailash_ml import ModelVisualizer
 from kailash_ml.engines.experiment_tracker import ExperimentTracker
 from kailash_ml.engines.model_registry import ModelRegistry
 from kailash_ml.bridge.onnx_bridge import OnnxBridge
-# Colab-adapted: inline helpers (shared module not available)
-import os
-from dotenv import load_dotenv
-
-def setup_environment():
-    """Set up environment for Colab."""
-    load_dotenv()
-
-def get_device():
-    """Return the best available device."""
-    import torch
-    if torch.cuda.is_available():
-        return torch.device('cuda')
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return torch.device('mps')
-    return torch.device('cpu')
+from shared.kailash_helpers import get_device, setup_environment
 
 # ════════════════════════════════════════════════════════════════════════
 # Environment + Device
@@ -73,6 +58,7 @@ BERT_MAX_LEN = 64
 BERT_EPOCHS = 3
 BERT_LR = 2e-5
 BERT_BATCH_SIZE = 32
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Core Attention Function (shared across 01, 02, 05)
@@ -106,12 +92,13 @@ def scaled_dot_product_attention(
     out = torch.einsum("bqk,bkd->bqd", weights, v)
     return out, weights
 
+
 # ════════════════════════════════════════════════════════════════════════
 # AG News Loading
 # ════════════════════════════════════════════════════════════════════════
 def load_ag_news_split(split: str, cache_name: str) -> pl.DataFrame:
     """Load AG News split, caching to parquet for subsequent runs."""
-    cache = Path(__file__).resolve().parents[3] / "data" / "mlfp05" / cache_name
+    cache = Path(__file__).resolve().parents[2] / "data" / "mlfp05" / cache_name
     cache.parent.mkdir(parents=True, exist_ok=True)
     if cache.exists():
         return pl.read_parquet(cache)
@@ -120,6 +107,7 @@ def load_ag_news_split(split: str, cache_name: str) -> pl.DataFrame:
     df = pl.from_pandas(ds.to_pandas())
     df.write_parquet(cache)
     return df
+
 
 def load_ag_news() -> tuple[pl.DataFrame, pl.DataFrame]:
     """Load full AG News train + test splits with status reporting."""
@@ -130,6 +118,7 @@ def load_ag_news() -> tuple[pl.DataFrame, pl.DataFrame]:
     print(f"  sample headline: {train_df['text'][0][:80]!r}")
     print(f"  class balance (train): {dict(Counter(train_df['label'].to_list()))}")
     return train_df, test_df
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Vocabulary + Tokenisation (for from-scratch models: LSTM + Transformer)
@@ -144,6 +133,7 @@ def build_vocab(texts: list[str], max_vocab: int = VOCAB_SIZE) -> dict[str, int]
         vocab[word] = len(vocab)
     return vocab
 
+
 def text_to_indices(
     text: str, vocab: dict[str, int], max_len: int = MAX_LEN
 ) -> list[int]:
@@ -151,6 +141,7 @@ def text_to_indices(
     tokens = text.lower().split()[:max_len]
     idxs = [vocab.get(t, 1) for t in tokens]
     return (idxs + [0] * (max_len - len(idxs)))[:max_len]
+
 
 def prepare_dataloaders(
     train_df: pl.DataFrame,
@@ -187,6 +178,7 @@ def prepare_dataloaders(
 
     return train_loader, val_loader, train_t, train_y, test_t, test_y
 
+
 # ════════════════════════════════════════════════════════════════════════
 # Kailash-ML Engine Setup
 # ════════════════════════════════════════════════════════════════════════
@@ -213,6 +205,7 @@ async def _setup_engines_async() -> (
 
     return conn, tracker, exp_name, registry, has_registry
 
+
 def setup_engines() -> tuple[
     ConnectionManager,
     ExperimentTracker,
@@ -230,6 +223,7 @@ def setup_engines() -> tuple[
     )
     bridge = OnnxBridge()
     return conn, tracker, exp_name, registry, has_registry, bridge
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Training Utilities
@@ -322,6 +316,7 @@ async def train_model_async(
 
     return train_losses, val_accs
 
+
 def train_model(
     model: nn.Module,
     model_name: str,
@@ -338,6 +333,7 @@ def train_model(
             model, model_name, train_loader, val_loader, tracker, exp_name, epochs, lr
         )
     )
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Visualisation Helpers
@@ -377,6 +373,7 @@ def create_attention_heatmap(
         height=500,
     )
     return fig
+
 
 def get_viz() -> ModelVisualizer:
     """Return a ModelVisualizer instance."""

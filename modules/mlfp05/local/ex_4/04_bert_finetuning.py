@@ -32,7 +32,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from transformers import BertTokenizer, BertForSequenceClassification
 
-from helpers import (
+from shared.mlfp05.ex_4 import (
     BERT_BATCH_SIZE,
     BERT_EPOCHS,
     BERT_LR,
@@ -319,7 +319,7 @@ for i, cls_name in enumerate(CLASS_NAMES):
     print(f"  {cls_name:<10} {acc:.3f} ({class_correct[i]}/{class_total[i]})")
 
 # Visualise BERT training curve
-from helpers import get_viz
+from shared.mlfp05.ex_4 import get_viz
 
 viz = get_viz()
 fig_bert = viz.training_history(

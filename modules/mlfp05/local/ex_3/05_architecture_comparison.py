@@ -35,7 +35,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-from ex_3.helpers import (
+from shared.mlfp05.ex_3 import (
     BATCH_SIZE,
     CLIP,
     EPOCHS,

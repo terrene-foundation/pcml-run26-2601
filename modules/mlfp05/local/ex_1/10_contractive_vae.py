@@ -35,7 +35,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from scipy.spatial.distance import cdist
 
-from helpers import (
+from shared.mlfp05.ex_1 import (
     INPUT_DIM,
     LATENT_DIM,
     EPOCHS,

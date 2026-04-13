@@ -45,7 +45,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from helpers import (
+from shared.mlfp05.ex_2 import (
     BATCH_SIZE,
     CLASS_NAMES,
     DEVICE,
@@ -246,7 +246,7 @@ print("--- Checkpoint 3 passed --- SimpleCNN trained successfully\n")
 
 # Register in ModelRegistry
 if has_registry:
-    from helpers import register_model
+    from shared.mlfp05.ex_2 import register_model
 
     # TODO: Register the trained model
     #   register_model(registry, "simple_cnn_cifar10", simple_cnn,

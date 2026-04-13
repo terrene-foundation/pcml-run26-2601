@@ -33,7 +33,7 @@ import torch.nn.functional as F
 
 import torchvision
 
-from helpers import (
+from shared.mlfp05.ex_7 import (
     BATCH_SIZE,
     EPOCHS,
     N_CLASSES,

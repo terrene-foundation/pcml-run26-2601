@@ -38,9 +38,10 @@ if TYPE_CHECKING:
 LATENT_DIM = 64
 IMG_DIM = 28 * 28
 BATCH_SIZE = 128
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data" / "mlfp05" / "mnist"
 OUTPUT_DIR = Path(__file__).resolve().parent
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Environment and device
@@ -53,6 +54,7 @@ def init_environment() -> torch.device:
     device = get_device()
     print(f"Using device: {device}")
     return device
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Data loading
@@ -92,6 +94,7 @@ def load_mnist(device: torch.device) -> tuple[torch.Tensor, torch.Tensor, DataLo
     )
     return X_real, y_real, real_loader
 
+
 # ════════════════════════════════════════════════════════════════════════
 # Kailash engine setup
 # ════════════════════════════════════════════════════════════════════════
@@ -121,9 +124,11 @@ def setup_engines() -> (
 
     return asyncio.run(_setup())
 
+
 async def close_engines(conn: ConnectionManager) -> None:
     """Cleanly shut down the connection manager."""
     await conn.close()
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Generator and Discriminator architectures
@@ -151,6 +156,7 @@ class Generator(nn.Module):
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         return self.net(z).view(-1, 1, 28, 28)
 
+
 class Discriminator(nn.Module):
     """MLP Discriminator: 28x28 -> scalar logit.
 
@@ -173,6 +179,7 @@ class Discriminator(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
+
 
 # ════════════════════════════════════════════════════════════════════════
 # FID feature extractor
@@ -203,6 +210,7 @@ class LeNetFeatureExtractor(nn.Module):
 
     def extract_features(self, x: torch.Tensor) -> torch.Tensor:
         return self.features(x)
+
 
 def train_feature_extractor(
     X_real: torch.Tensor,
@@ -235,6 +243,7 @@ def train_feature_extractor(
 
     extractor.eval()
     return extractor
+
 
 # ════════════════════════════════════════════════════════════════════════
 # FID computation
@@ -274,6 +283,7 @@ def compute_fid(
 
     return float(diff @ diff + np.trace(sig_r + sig_g - 2 * sqrt_prod))
 
+
 # ════════════════════════════════════════════════════════════════════════
 # Mode coverage diagnostic
 # ════════════════════════════════════════════════════════════════════════
@@ -299,6 +309,7 @@ def mode_coverage(
     probs = counts / counts.sum()
     entropy = float(-np.sum(probs * np.log2(probs + 1e-10)))
     return int(len(unique)), {int(k): int(v) for k, v in zip(unique, counts)}, entropy
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Visualisation helpers
@@ -336,6 +347,7 @@ def plot_image_grid(
         print(f"  Saved: {save_path}")
     return fig
 
+
 def plot_latent_interpolation(
     G: Generator,
     device: torch.device,
@@ -370,6 +382,7 @@ def plot_latent_interpolation(
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"  Saved: {save_path}")
     return fig
+
 
 def plot_training_progression(
     G: Generator,
@@ -415,6 +428,7 @@ def plot_training_progression(
         print(f"  Saved: {save_path}")
     return fig
 
+
 def plot_loss_curves(
     g_losses: list[float],
     d_losses: list[float],
@@ -453,6 +467,7 @@ def plot_loss_curves(
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"  Saved: {save_path}")
     return fig
+
 
 # ════════════════════════════════════════════════════════════════════════
 # Model registration helper

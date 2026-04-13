@@ -25,7 +25,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from helpers import (
+from shared.mlfp05.ex_4 import (
     CLASS_NAMES,
     DEVICE,
     EPOCHS_SCRATCH,
@@ -177,11 +177,11 @@ print("\n--- Checkpoint 2 passed --- LSTM baseline trained\n")
 # LSTM must learn to propagate information through the hidden state chain.
 
 # TODO: Visualise LSTM training curves using ModelVisualizer
-# Hint: from helpers import get_viz
+# Hint: from shared.mlfp05.ex_4 import get_viz
 # Hint: viz = get_viz()
 # Hint: fig_lstm = viz.training_history(metrics={"LSTM train_loss": lstm_losses, "LSTM val_accuracy": lstm_accs}, x_label="Epoch", y_label="Value")
 # Hint: fig_lstm.write_html("ex_4_3_lstm_training_curves.html")
-from helpers import get_viz
+from shared.mlfp05.ex_4 import get_viz
 
 viz = ...  # YOUR CODE HERE — get_viz()
 fig_lstm = ...  # YOUR CODE HERE — viz.training_history(...)

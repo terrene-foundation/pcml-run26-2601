@@ -30,7 +30,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
-from helpers import (
+from shared.mlfp05.ex_5 import (
     LATENT_DIM,
     OUTPUT_DIR,
     Generator,
