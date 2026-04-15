@@ -1,0 +1,138 @@
+Using device: mps
+  ^STI (Straits Times Index): 3748 days [cache]
+  DBS.SI unavailable (RuntimeError: yfinance returned empty frame for DBS.SI)
+  9988.HK (Alibaba HK): 1253 days [cache]
+  AAPL (Apple): 3773 days [cache]
+  005930.KS (Samsung): 3694 days [cache]
+  7203.T (Toyota): 3691 days [cache]
+
+Primary: ^STI -- 3748 days, 2010-01-04 00:00:00 -> 2024-12-30 00:00:00
+Built 3724 windows (seq_len=20, horizon=5); train 2978, val 746
+  X_train: (2978, 20, 4)  y_train: (2978, 5)
+  X_val:   (746, 20, 4)    y_val:   (746, 5)
+--- Checkpoint 1 passed --- data and tracking ready
+
+GRU parameters:  13,765
+LSTM parameters: 18,245
+GRU is 75% of LSTM parameter count (25% fewer)
+--- Checkpoint 2 passed --- GRU architecture verified
+
+
+== Training GRU on ^STI ==
+  [GRU] 13,765 parameters
+  [GRU] epoch  1/15  train=0.3480  val=0.1645  grad=0.7826
+  [GRU] epoch  2/15  train=0.0596  val=0.0924  grad=0.1907
+  [GRU] epoch  3/15  train=0.0470  val=0.0670  grad=0.1234
+  [GRU] epoch  4/15  train=0.0425  val=0.0606  grad=0.1161
+  [GRU] epoch  5/15  train=0.0404  val=0.0543  grad=0.1239
+  [GRU] epoch  6/15  train=0.0388  val=0.0503  grad=0.0936
+  [GRU] epoch  7/15  train=0.0382  val=0.0446  grad=0.1056
+  [GRU] epoch  8/15  train=0.0375  val=0.0445  grad=0.1082
+  [GRU] epoch  9/15  train=0.0367  val=0.0427  grad=0.0844
+  [GRU] epoch 10/15  train=0.0367  val=0.0425  grad=0.1110
+  [GRU] epoch 11/15  train=0.0363  val=0.0403  grad=0.0997
+  [GRU] epoch 12/15  train=0.0359  val=0.0406  grad=0.1041
+  [GRU] epoch 13/15  train=0.0355  val=0.0400  grad=0.1017
+  [GRU] epoch 14/15  train=0.0351  val=0.0388  grad=0.0973
+  [GRU] epoch 15/15  train=0.0350  val=0.0393  grad=0.0937
+
+── Diagnostic Report (GRU) ──
+
+════════════════════════════════════════════════════════════════
+  DL Diagnostics Report — Prescription Pad
+════════════════════════════════════════════════════════════════
+  [X] Gradient flow (CRITICAL): Exploding gradients at 'head.bias' — max RMS = 1.50e-02, max update_ratio = 3.16e-01. Fix: add gradient clipping (or adaptive: ZClip/AGC), reduce LR, verify initialization (Kaiming for ReLU, Xavier for Tanh).
+  [?] Dead neurons  (UNKNOWN): No activation layers tracked — call track_activations().
+  [!] Loss trend    (WARNING): Overfitting suspected at epoch 11 (val loss rising while train loss falls). Consider dropout, weight decay, or early stopping.
+════════════════════════════════════════════════════════════════
+
+
+  Final val loss: 0.0393
+--- Checkpoint 3 passed --- GRU trained
+
+
+== Training LSTM (comparison) on ^STI ==
+  [LSTM_compare] 18,245 parameters
+  [LSTM_compare] epoch  1/15  train=0.4534  val=0.2494  grad=0.6025
+  [LSTM_compare] epoch  2/15  train=0.0756  val=0.1213  grad=0.1990
+  [LSTM_compare] epoch  3/15  train=0.0523  val=0.0998  grad=0.1420
+  [LSTM_compare] epoch  4/15  train=0.0474  val=0.0793  grad=0.1516
+  [LSTM_compare] epoch  5/15  train=0.0437  val=0.0711  grad=0.1261
+  [LSTM_compare] epoch  6/15  train=0.0418  val=0.0698  grad=0.1370
+  [LSTM_compare] epoch  7/15  train=0.0413  val=0.0616  grad=0.1351
+  [LSTM_compare] epoch  8/15  train=0.0397  val=0.0585  grad=0.1405
+  [LSTM_compare] epoch  9/15  train=0.0385  val=0.0571  grad=0.1215
+  [LSTM_compare] epoch 10/15  train=0.0379  val=0.0525  grad=0.1233
+  [LSTM_compare] epoch 11/15  train=0.0374  val=0.0506  grad=0.1327
+  [LSTM_compare] epoch 12/15  train=0.0369  val=0.0545  grad=0.1382
+  [LSTM_compare] epoch 13/15  train=0.0362  val=0.0480  grad=0.1191
+  [LSTM_compare] epoch 14/15  train=0.0365  val=0.0557  grad=0.1435
+  [LSTM_compare] epoch 15/15  train=0.0356  val=0.0492  grad=0.1178
+
+  == Head-to-Head Comparison ==
+  Metric                           GRU       LSTM
+  Parameters...............     13,765     18,245
+  Final val loss...........     0.0393     0.0492
+  Avg grad norm............     0.1557     0.1687
+--- Checkpoint 4 passed --- head-to-head comparison complete
+
+
+== Inference Latency Comparison ==
+  GRU: 2.572 ms/inference (avg over 100 runs)
+  LSTM: 0.190 ms/inference (avg over 100 runs)
+  GRU speedup: 0.07x faster than LSTM
+  Saved: 03_gru_latency_comparison.png
+--- Checkpoint 5 passed --- latency comparison complete
+
+  Saved: 03_gru_hidden_dynamics.png
+  Saved: 03_gru_time_series_overlay.png
+
+  Forecast Error by Horizon Day (GRU):
+    Day 1: RMSE=28.18
+    Day 2: RMSE=38.55
+    Day 3: RMSE=46.60
+    Day 4: RMSE=53.85
+    Day 5: RMSE=59.43
+--- Checkpoint 6 passed --- GRU visualisations generated
+
+  ModelRegistry registration skipped (AttributeError: 'ModelRegistry' object has no attribute 'register')
+
+======================================================================
+  APPLY: SMRT Predictive Maintenance — Vibration Monitoring
+======================================================================
+
+[RUNNER ERROR] Traceback (most recent call last):
+  File "/tmp/run_03_gru.py", line 11, in <module>
+    ns = runpy.run_path(r"/Users/esperie/repos/lyceum/courses/mlfp/modules/mlfp05/solutions/ex_3/03_gru.py", run_name="__main__")
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/esperie/repos/lyceum/courses/mlfp/modules/mlfp05/solutions/ex_3/03_gru.py", line 601, in <module>
+    sensor_gru_lat = benchmark_inference(sensor_gru, "Sensor GRU (h=16)", n_runs=500)
+  File "/Users/esperie/repos/lyceum/courses/mlfp/modules/mlfp05/solutions/ex_3/03_gru.py", line 330, in benchmark_inference
+    model(test_input)
+    ~~~~~^^^^^^^^^^^^
+  File "/Users/esperie/repos/lyceum/courses/mlfp/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/esperie/repos/lyceum/courses/mlfp/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/Users/esperie/repos/lyceum/courses/mlfp/modules/mlfp05/solutions/ex_3/03_gru.py", line 144, in forward
+    out, _ = self.gru(x)
+             ~~~~~~~~^^^
+  File "/Users/esperie/repos/lyceum/courses/mlfp/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/esperie/repos/lyceum/courses/mlfp/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/Users/esperie/repos/lyceum/courses/mlfp/.venv/lib/python3.13/site-packages/torch/nn/modules/rnn.py", line 1446, in forward
+    self.check_forward_args(input, hx, batch_sizes)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/esperie/repos/lyceum/courses/mlfp/.venv/lib/python3.13/site-packages/torch/nn/modules/rnn.py", line 380, in check_forward_args
+    self.check_input(input, batch_sizes)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/esperie/repos/lyceum/courses/mlfp/.venv/lib/python3.13/site-packages/torch/nn/modules/rnn.py", line 329, in check_input
+    raise RuntimeError(
+        f"input.size(-1) must be equal to input_size. Expected {self.input_size}, got {input.size(-1)}"
+    )
+RuntimeError: input.size(-1) must be equal to input_size. Expected 1, got 4

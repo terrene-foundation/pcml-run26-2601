@@ -1,0 +1,144 @@
+======================================================================
+  PHASE 1 — THEORY: Graph Convolutional Networks
+======================================================================
+
+  WHY GRAPHS NEED SPECIAL ARCHITECTURES:
+  - Tabular methods ignore relational structure (citation links)
+  - Variable-size neighbourhoods can't be flattened to a fixed vector
+  - Graph structure carries classification signal independent of features
+
+  GCN MESSAGE PASSING (the "gossip protocol"):
+  1. Collect — each node gathers features from neighbours
+  2. Aggregate — average features (weighted by degree)
+  3. Transform — pass through learnable weights
+  4. Stack — multiple layers = multi-hop information flow
+
+  Formula:  H' = sigma( D^{-1/2} A D^{-1/2} H W )
+  The ENTIRE neighbourhood aggregation is ONE matrix multiply!
+
+======================================================================
+  PHASE 2 — BUILD: GCN Layer + Model
+======================================================================
+Graph: Cora — 2708 nodes, 5278 undirected edges, feature_dim=1433, classes=7
+  per-class counts: c0=351, c1=217, c2=418, c3=818, c4=426, c5=298, c6=180
+  train: 539, val: 539, test: 1630
+
+  GCN architecture:
+    Layer 1: GCNLayer(1433 -> 64)
+    Layer 2: GCNLayer(64 -> 7)
+    Total parameters: 92,231
+
+  How it works:
+    Input:  2708 nodes x 1433 features
+    Layer 1: A_norm @ (X @ W1) -> 2708 x 64 (neighbourhood averages)
+    ReLU + Dropout(0.5)
+    Layer 2: A_norm @ (H @ W2) -> 2708 x 7 (class logits)
+
+--- Build checkpoint passed --- GCN architecture created
+
+======================================================================
+  PHASE 3 — TRAIN: GCN on Cora
+======================================================================
+  [GCN] parameters: 92,231
+  [GCN] epoch  25  loss=0.0984  val_acc=0.857  test_acc=0.863
+  [GCN] epoch  50  loss=0.0518  val_acc=0.846  test_acc=0.863
+  [GCN] epoch  75  loss=0.0474  val_acc=0.840  test_acc=0.858
+  [GCN] epoch 100  loss=0.0434  val_acc=0.844  test_acc=0.852
+
+  GCN Results:
+    Best validation accuracy: 0.8701
+    Best test accuracy:       0.8650
+    Final loss:               0.0434
+
+--- Train checkpoint passed --- GCN trained successfully
+
+======================================================================
+  PHASE 4 — VISUALISE: GCN Node Embeddings
+======================================================================
+  Saved: outputs/ex6_gnns/gcn_node_embeddings.png
+
+  GCN Node Embeddings (True Labels) — Cora — first 3 nodes per class:
+    class 0: (-0.45, -2.25), (-0.53, -0.81), (-1.05, -0.32)
+    class 1: (-1.27, +0.19), (-0.70, +0.93), (+0.64, +0.13)
+    class 2: (-2.35, +1.91), (-1.80, +0.85), (-2.27, +0.38)
+    class 3: (+1.61, +1.27), (-0.02, +1.22), (+0.21, -1.22)
+    class 4: (+2.45, -1.13), (+1.47, -0.01), (+0.71, -0.95)
+    class 5: (-1.19, -1.14), (-0.44, -1.53), (-1.05, -0.63)
+    class 6: (+0.79, -0.69), (-0.26, -1.07), (-1.35, -0.71)
+  Saved: outputs/ex6_gnns/gcn_node_embeddings_predicted.png
+
+  GCN Node Embeddings (Predicted Labels) — Cora — first 3 nodes per class:
+    class 0: (-0.45, -2.25), (-0.53, -0.81), (+0.21, -1.22)
+    class 1: (-1.05, -0.32), (-1.27, +0.19), (-0.70, +0.93)
+    class 2: (-2.35, +1.91), (-1.80, +0.85), (-2.27, +0.38)
+    class 3: (+1.61, +1.27), (-0.02, +1.22), (+1.56, +1.47)
+    class 4: (+2.45, -1.13), (+1.47, -0.01), (+0.71, -0.95)
+    class 5: (-1.19, -1.14), (-0.44, -1.53), (-1.05, -0.63)
+    class 6: (-0.26, -1.07), (-1.35, -0.71), (-0.80, -1.15)
+  Saved: outputs/ex6_gnns/gcn_graph_embeddings.png
+  Saved: outputs/ex6_gnns/gcn_accuracy_curves.html
+  Saved: outputs/ex6_gnns/gcn_loss_curve.html
+
+--- Visualise checkpoint passed --- GCN embeddings plotted
+
+======================================================================
+  PHASE 5 — APPLY: Research Paper Classification at NUS/NTU
+======================================================================
+
+  SCENARIO: You're building a research analytics tool for NUS or NTU.
+  The university publishes thousands of papers per year across faculties.
+  Your task: automatically classify papers into research fields using
+  both their text features AND citation links.
+
+  WHY GCN BEATS BAG-OF-WORDS BASELINE:
+  Consider a paper titled "Efficient Training of Vision Transformers".
+  - Bag-of-words features: high weight on "training", "efficient", "vision"
+    -> Could be Computer Vision OR Systems/Optimisation
+  - Citation links: cites ViT, DeiT, DINO (all CV papers)
+    -> GCN correctly classifies as Computer Vision
+
+  The citation graph is a free signal that bag-of-words models ignore.
+
+  Bag-of-Words Baseline vs GCN Comparison:
+    Bag-of-Words (no graph):  test accuracy = 0.6018
+    GCN (with graph):         test accuracy = 0.8650
+    Improvement from graph:   +0.2632 (26.3 pp)
+
+  INSIGHT: The citation graph provides significant additional signal.
+  Papers in the same field cite each other more often, creating
+  class-homogeneous neighbourhoods that the GCN exploits.
+
+  REAL-WORLD DEPLOYMENT:
+  1. Build a citation graph from Scopus/Web of Science API
+  2. Extract bag-of-words or TF-IDF features from abstracts
+  3. Train GCN on papers with known faculty/department labels
+  4. Classify new papers automatically for research analytics dashboards
+  5. Track with ExperimentTracker — retrain quarterly as citation graph grows
+
+  Registered GCN: version=2, val_acc=0.8701
+
+--- Apply checkpoint passed --- GCN vs baseline comparison complete
+
+
+======================================================================
+  WHAT YOU'VE MASTERED — GCN
+======================================================================
+
+  GRAPH CONVOLUTIONAL NETWORK (Kipf & Welling, 2017):
+  [x] Message passing as matrix multiplication: H' = A_norm @ H @ W
+  [x] Fixed aggregation via degree-normalised adjacency (Laplacian)
+  [x] Simplest GNN — fast, parallelisable, effective on homogeneous graphs
+  [x] Trained on Cora: 87.0% val accuracy, 86.5% test accuracy
+  [x] Compared to bag-of-words baseline: +26.3 percentage points
+  [x] Visualised embeddings showing class separation in 2-D PCA
+
+  KEY LIMITATION: GCN uses FIXED aggregation weights (degree-based).
+  All neighbours contribute equally regardless of relevance. What if
+  some citations are more important than others?
+
+  Next: Exercise 6.2 — Graph Attention Networks (GAT) learn which
+  neighbours matter most via attention weights...
+
+
+── Diagnostic Report (GCN — Graph Convolutional Network) ──
+[diagnostic skipped: name 'features' is not defined]

@@ -1,0 +1,151 @@
+  Apple MPS detected -- using 32-bit precision (no fp16 compute units)
+======================================================================
+  PHASE 1 — THEORY: Why Convolutions Work for Images
+======================================================================
+
+  KEY CONCEPTS:
+  - Local receptive fields: scan small patches, not the whole image
+  - Weight sharing: same 3x3 filter applied at every position
+  - Spatial hierarchy: edges -> textures -> parts -> objects
+  - Translation invariance: recognise WHAT, not WHERE
+  - BatchNorm: stabilise training by normalising activations
+  - MaxPool: summarise spatial regions, reduce dimensions by 2x
+
+
+======================================================================
+  PHASE 2 — BUILD: SimpleCNN Architecture
+======================================================================
+
+SimpleCNN built successfully
+  Parameters: 545,290
+  Input shape: (batch, 3, 32, 32)
+  Output shape: (batch, 10)
+
+--- Checkpoint 1 passed --- SimpleCNN architecture verified
+
+======================================================================
+  PHASE 3 — TRAIN: SimpleCNN on full CIFAR-10
+======================================================================
+CIFAR-10: train (50000, 3, 32, 32), val (10000, 3, 32, 32), classes=10: ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+--- Checkpoint 2 passed --- CIFAR-10 loaded (50K train, 10K val)
+
+
+Training SimpleCNN for 8 epochs on 50,000 images...
+  [SimpleCNN] final train loss=0.4957  val acc=0.720
+
+── Diagnostic Report (SimpleCNN) ──
+
+════════════════════════════════════════════════════════════════
+  DL Diagnostics Report — Prescription Pad
+════════════════════════════════════════════════════════════════
+  [X] Gradient flow (CRITICAL): Vanishing gradients at 'features.4.bias' — min RMS = 4.28e-09, min update_ratio = 1.07e-07. Fix: verify pre-norm layout (LayerNorm/RMSNorm before block), add residual connections, switch to GELU/SiLU, or use Kaiming init.
+  [!] Dead neurons  (WARNING): 'head.2' (relu): 81% dead neurons. Switch to GELU/LeakyReLU or re-initialise with Kaiming.
+  [✓] Loss trend    (HEALTHY): Loss converging (train slope -9.34e-02/epoch).
+════════════════════════════════════════════════════════════════
+
+  Grad-CAM skipped (Input type (MPSFloatType) and weight type (torch.FloatTensor) should be the same)
+
+SimpleCNN final: loss=0.4957, val_acc=0.720
+--- Checkpoint 3 passed --- SimpleCNN trained successfully
+
+  Registered simple_cnn_cifar10: version=1, acc=0.720
+  Saved plot: ex_2_01_simple_cnn_loss.html
+  Saved plot: ex_2_01_simple_cnn_acc.html
+======================================================================
+  PHASE 4 — VISUALISE: What Did the CNN Learn?
+======================================================================
+  Saved: ex_2_01_learned_filters.png
+  Look for: edge detectors (horizontal, vertical, diagonal lines)
+  Some filters will be colour-sensitive (responding to red/green/blue edges)
+
+  Saved: ex_2_01_feature_maps.png
+  Sample: true='frog', predicted='frog'
+  Layer 1 maps: edges and colour boundaries (high-res, 32x32)
+  Layer 2 maps: textures and shapes (lower-res, 8x8 after pooling)
+  Saved: ex_2_01_predictions.png
+  Green = correct, Red = incorrect. Confidence shown in parentheses.
+
+--- Checkpoint 4 passed --- visual proof of model behaviour saved
+
+======================================================================
+  PHASE 5 — APPLY: Singapore E-Commerce Product Categorisation
+======================================================================
+
+  PRODUCTION TRIAGE SIMULATION (10,000 product listings):
+
+  Category         | Count  | % Total | Accuracy
+  -----------------+--------+---------+---------
+  Auto-approved    | 5,332 |  53.3%  | 90.8%
+  Needs review     | 3,620 |  36.2%  | 57.3%
+  Low confidence   | 1,048 |  10.5%  | (routed to human)
+
+  BUSINESS IMPACT (daily projection for 500K listings):
+    Auto-approved listings:   266,600 (no human cost)
+    Human review needed:      181,000 (@ $0.02/review)
+    Daily review cost:        $  4,668
+    vs. full manual review:   $  10,000
+    Daily savings:            $  5,332
+    Projected annual savings: $ 1,946,180
+
+  STAKEHOLDER INSIGHT:
+    Auto-approved accuracy of 90.8% means 9.2% error rate
+    on automated decisions. For an e-commerce platform, this means
+    roughly 24,399 mis-categorised products
+    per day slip through without human review.
+
+    RECOMMENDATION: Accept this if mis-categorisation cost < $0.50/item.
+    For high-value categories (electronics, luxury), lower the auto-approve
+    threshold to 0.95 and accept higher review volume.
+
+  EXAMPLE AUTO-APPROVED LISTINGS:
+    Listing #1: ship -> Travel & Luggage (conf=0.98) [CORRECT]
+    Listing #5: frog -> Toys & Collectibles (conf=0.94) [CORRECT]
+    Listing #6: automobile -> Automotive (conf=0.99) [CORRECT]
+    Listing #8: cat -> Pet Supplies (conf=0.92) [CORRECT]
+    Listing #9: automobile -> Automotive (conf=0.98) [CORRECT]
+
+  EXAMPLE REVIEW-NEEDED LISTINGS:
+    Listing #0: predicted=cat (conf=0.74), true=cat -> NEEDS HUMAN REVIEW
+    Listing #2: predicted=airplane (conf=0.65), true=ship -> NEEDS HUMAN REVIEW
+    Listing #3: predicted=ship (conf=0.51), true=airplane -> NEEDS HUMAN REVIEW
+    Listing #4: predicted=frog (conf=0.80), true=frog -> NEEDS HUMAN REVIEW
+    Listing #7: predicted=frog (conf=0.77), true=frog -> NEEDS HUMAN REVIEW
+
+--- Checkpoint 5 passed --- e-commerce application demonstrated
+
+
+======================================================================
+  WHAT YOU'VE MASTERED
+======================================================================
+
+  THEORY:
+  [x] Convolutions scan local patches with shared weights -- 3x3 filters
+      detect edges at every position with only 9 parameters
+  [x] Spatial hierarchy: edges -> textures -> parts -> objects, each
+      layer building on the previous
+  [x] BatchNorm stabilises training; MaxPool adds translation invariance
+
+  BUILD + TRAIN:
+  [x] SimpleCNN: Conv2d + BatchNorm + ReLU + MaxPool, two-block design
+  [x] Trained on FULL CIFAR-10 (50K images) with ExperimentTracker
+  [x] ~{param_count:,} parameters, achieves >{simple_accs[-1]:.0%} validation accuracy
+
+  VISUALISE (the proof):
+  [x] Layer 1 filters: oriented edge detectors (Gabor-like patterns)
+  [x] Feature maps: which spatial regions activate each filter
+  [x] Prediction grid: where the model succeeds and fails, with confidence
+
+  APPLY:
+  [x] Singapore e-commerce product auto-categorisation
+  [x] Confidence-based triage: auto-approve vs human review
+  [x] Business impact: projected annual savings from automation
+  [x] Stakeholder-ready accuracy and error rate analysis
+
+  KEY INSIGHT: A CNN is not a black box. The filters it learns are
+  interpretable -- they are the visual features the network considers
+  important. Filter and feature map visualisation is how you debug and
+  explain CNN decisions to non-technical stakeholders.
+
+  Next: In 02_resnet_se.py, you'll see why deeper networks fail and how
+  residual connections and attention mechanisms fix the problem...
+
