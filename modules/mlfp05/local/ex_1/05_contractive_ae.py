@@ -366,7 +366,7 @@ print(
 # This SHRINKS gradients near the bottleneck by design, so the Blood
 # Test will look "low" — the question is whether it is CRITICALLY low
 # (vanishing) or just REGULARISED low (intended).
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

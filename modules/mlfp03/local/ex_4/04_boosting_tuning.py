@@ -242,6 +242,33 @@ print("\n[ok] Checkpoint 2 passed — all tuning visualisations saved\n")
 
 
 # ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson built XGBoost from primitives — early stopping, tree depth
+# tuning, business-metric optimisation. The kailash-ml SDK packages the
+# diagnostic surface (per-class metrics, class-balance severity,
+# confusion matrix, accuracy heuristics) into a single call.
+#
+# Destination-first: when the journey is internalised, the SDK is one line.
+
+from kailash_ml import diagnose
+
+# `kind="classical_classifier"` dispatches to the sklearn ClassifierMixin
+# adapter. XGBClassifier implements the ClassifierMixin interface.
+report = diagnose(
+    es_model, kind="classical_classifier", data=(X_test, y_test), show=False
+)
+print()
+print(f"  km.diagnose model    : XGBoost (early-stopped at iter {best_iter_xgb})")
+print(f"  km.diagnose metrics  : {report.metrics}")
+print(f"  km.diagnose severity : {report.severity}")
+print()
+print("km.diagnose: 1 call -> the same diagnostic surface the lesson body")
+print("hand-rolled across the early-stopping sweep. Destination-first:")
+print("when the journey is internalised, the SDK is one line.")
+
+
+# ════════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ════════════════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)

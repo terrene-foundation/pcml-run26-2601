@@ -133,8 +133,8 @@ async def _train_dqn_timed():
     episode_rewards: list[float] = []
     env_steps = 0
 
-    async with tracker.run(experiment_name=exp_name, run_name="comparison_dqn") as ctx:
-        await ctx.log_params({"algorithm": "DQN", "episodes": str(N_DQN_EPISODES)})
+    async with tracker.track(experiment=exp_name, run_name="comparison_dqn") as run:
+        await run.log_params({"algorithm": "DQN", "episodes": str(N_DQN_EPISODES)})
         for ep in range(N_DQN_EPISODES):
             state, _ = cartpole_env.reset(seed=42 + ep)
             total_reward = 0.0
@@ -166,7 +166,7 @@ async def _train_dqn_timed():
             if (ep + 1) % 10 == 0:
                 target_net.load_state_dict(q_net.state_dict())
             episode_rewards.append(total_reward)
-            await ctx.log_metric("episode_reward", total_reward, step=ep)
+            await run.log_metric("episode_reward", total_reward, step=ep)
     N_DQN_ENV_STEPS = env_steps
     return q_net, episode_rewards
 
@@ -191,8 +191,8 @@ async def _train_ppo_timed():
     opt = torch.optim.Adam(model.parameters(), lr=3e-4)
     iter_returns: list[float] = []
 
-    async with tracker.run(experiment_name=exp_name, run_name="comparison_ppo") as ctx:
-        await ctx.log_params({"algorithm": "PPO", "iterations": str(N_PPO_ITERS)})
+    async with tracker.track(experiment=exp_name, run_name="comparison_ppo") as run:
+        await run.log_params({"algorithm": "PPO", "iterations": str(N_PPO_ITERS)})
         for it in range(N_PPO_ITERS):
             # Collect trajectory
             states, actions, log_probs, values, rewards, dones = [], [], [], [], [], []
@@ -251,7 +251,7 @@ async def _train_ppo_timed():
                     running = 0.0
             avg_ret = float(np.mean(ep_rs)) if ep_rs else float(running)
             iter_returns.append(avg_ret)
-            await ctx.log_metric("avg_episode_return", avg_ret, step=it)
+            await run.log_metric("avg_episode_return", avg_ret, step=it)
     return model, iter_returns
 
 
@@ -620,6 +620,34 @@ cartpole_env.close()
 asyncio.run(conn.close())
 
 
+# ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson walked the journey of reinforcement learning algorithms —
+# Random baseline, DQN with replay buffers, PPO with GAE — each with its
+# own training loop, environment-step accounting, and decision framework.
+# The kailash-ml SDK ships a single-call diagnostic primitive that
+# closes the production loop: km.diagnose inspects a trained model and
+# emits an auto-dashboard (loss curves, gradient flow, dead neurons,
+# activation stats, weight distributions). One cell. Every diagnostic
+# students would otherwise hand-roll, ready to surface in a Plotly
+# dashboard.
+
+from kailash_ml import diagnose
+
+# RL networks are torch.nn.Module — `kind='auto'` correctly dispatches
+# them to DLDiagnostics (verified empirically; no rl-specific kind needed
+# for the policy network's gradient/activation surface). We feed a small
+# iterable of observation-shaped tensors as the diagnostic batch.
+obs_iter = [torch.randn(64, obs_dim, device=device) for _ in range(4)]
+report = diagnose(dqn_model, kind="auto", data=obs_iter, show=False)
+report.plot_training_dashboard()
+print()
+print("km.diagnose: 1 line of code -> the same observability the lesson")
+print("body hand-rolled in 200+ lines. This is what 'destination-first'")
+print("means — when the journey is internalised, the SDK is one call.")
+
+
 # ══════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ══════════════════════════════════════════════════════════════════════
@@ -671,9 +699,9 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — five instruments before Visualise
 # ══════════════════════════════════════════════════════════════════
-# Reference: `shared/mlfp05/diagnostics.py` — see gold standard
+# Reference: `kailash_ml.diagnostics` (via `kailash-ml`) — see gold standard
 # `solutions/ex_1/01_standard_ae.py` for the full pattern.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):
@@ -686,6 +714,7 @@ def _diag_loss(m, batch):
         x, y = batch, None
     out = m(x)
     import torch.nn.functional as F
+
     if y is None:
         return F.mse_loss(out, x)
     return F.cross_entropy(out, y)
@@ -728,4 +757,3 @@ except Exception as exc:
 #     Discrete or continuous + online + stability priority → PPO
 #     Continuous + hard exploration → SAC
 #     Slide 5.8 Prescription Pad for RL.
-

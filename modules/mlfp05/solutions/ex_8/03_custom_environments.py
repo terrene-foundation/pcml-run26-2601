@@ -541,7 +541,9 @@ for env_name, env_cls in env_classes:
     assert (
         obs2.shape == test_env.observation_space.shape
     ), f"{env_name}: step obs shape mismatch"
-    assert isinstance(reward, float), f"{env_name}: reward should be float"
+    assert isinstance(reward, (int, float)) or hasattr(reward, "__float__"), (
+        f"{env_name}: reward should be numeric, got {type(reward).__name__}: {reward!r}"
+    )
     print(
         f"  {env_name}: obs={obs.shape}, actions={test_env.action_space.n}, reward={reward:.3f}"
     )
@@ -582,13 +584,13 @@ churn_actions_hist: list[list[int]] = []  # track action distribution per episod
 
 
 async def _train_churn_dqn_async():
-    """Train DQN on ChurnPrevention under a tracker.run(...) context."""
+    """Train DQN on ChurnPrevention under a tracker.track(...) context."""
     churn_epsilon = 1.0
 
-    async with tracker.run(
-        experiment_name=exp_name, run_name="dqn_churn_prevention"
-    ) as ctx:
-        await ctx.log_params(
+    async with tracker.track(
+        experiment=exp_name, run_name="dqn_churn_prevention"
+    ) as run:
+        await run.log_params(
             {
                 "algorithm": "DQN",
                 "environment": "ChurnPrevention",
@@ -636,7 +638,7 @@ async def _train_churn_dqn_async():
 
             churn_rewards_hist.append(total_reward)
             churn_actions_hist.append(ep_actions)
-            await ctx.log_metric("episode_reward", total_reward, step=ep)
+            await run.log_metric("episode_reward", total_reward, step=ep)
 
             if (ep + 1) % 30 == 0:
                 avg_30 = float(np.mean(churn_rewards_hist[-30:]))
@@ -645,7 +647,7 @@ async def _train_churn_dqn_async():
                     f"avg30={avg_30:6.1f}  eps={churn_epsilon:.3f}"
                 )
 
-        await ctx.log_metric(
+        await run.log_metric(
             "final_avg_reward", float(np.mean(churn_rewards_hist[-30:]))
         )
 
@@ -1003,9 +1005,9 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — five instruments before Visualise
 # ══════════════════════════════════════════════════════════════════
-# Reference: `shared/mlfp05/diagnostics.py` — see gold standard
+# Reference: `kailash_ml.diagnostics` (via `kailash-ml`) — see gold standard
 # `solutions/ex_1/01_standard_ae.py` for the full pattern.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

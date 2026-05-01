@@ -34,7 +34,7 @@ from shared.mlfp06.ex_1 import (
     get_eval_docs,
     normalise_label,
     plot_comparison_bars,
-    plot_cost_vs_accuracy,
+    plot_tokens_vs_accuracy,
     print_summary,
     run_delegate,
 )
@@ -71,16 +71,16 @@ load_dotenv()
 
 
 async def zero_shot_cot_classify(text: str) -> tuple[str, str, float, float]:
-    """Classify by appending the Kojima trigger phrase. Returns (label, reasoning, cost, elapsed)."""
+    """Classify by appending the Kojima trigger phrase. Returns (label, reasoning, tokens, elapsed)."""
     prompt = f"""Classify the sentiment of this movie review as "positive" or "negative".
 
 Review: "{text[:800]}"
 
 Let's think step by step."""
 
-    response, cost, elapsed = await run_delegate(prompt)
+    response, tokens, elapsed = await run_delegate(prompt)
     reasoning = response.strip()
-    return normalise_label(reasoning), reasoning, cost, elapsed
+    return normalise_label(reasoning), reasoning, tokens, elapsed
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -94,7 +94,7 @@ async def evaluate() -> list[dict]:
     for i, (text, true_label) in enumerate(
         zip(docs["text"].to_list(), docs["label"].to_list())
     ):
-        pred, reasoning, cost, elapsed = await zero_shot_cot_classify(text)
+        pred, reasoning, tokens, elapsed = await zero_shot_cot_classify(text)
         correct = pred == true_label
         results.append(
             {
@@ -102,7 +102,7 @@ async def evaluate() -> list[dict]:
                 "pred": pred,
                 "true": true_label,
                 "correct": correct,
-                "cost": cost,
+                "tokens": tokens,
                 "elapsed": elapsed,
                 "reasoning": reasoning,
             }
@@ -137,21 +137,21 @@ print_summary(zs_cot_results, "Zero-Shot CoT")
 zero_shot_expected = {
     "strategy": "Zero-Shot",
     "accuracy": 0.80,
-    "total_cost": 0.002,
+    "total_tokens": 1500,
     "avg_latency_s": 1.0,
     "n": 20,
 }
 few_shot_expected = {
     "strategy": "Few-Shot",
     "accuracy": 0.85,
-    "total_cost": 0.006,
+    "total_tokens": 5400,
     "avg_latency_s": 1.2,
     "n": 20,
 }
 cot_expected = {
     "strategy": "CoT",
     "accuracy": 0.90,
-    "total_cost": 0.015,
+    "total_tokens": 10500,
     "avg_latency_s": 3.5,
     "n": 20,
 }
@@ -164,7 +164,7 @@ plot_comparison_bars(
     filename="ex1_04_method_comparison.png",
 )
 
-plot_cost_vs_accuracy(
+plot_tokens_vs_accuracy(
     all_methods,
     title="Cost vs Accuracy — Full Prompting Ladder",
     filename="ex1_04_cost_vs_accuracy.png",

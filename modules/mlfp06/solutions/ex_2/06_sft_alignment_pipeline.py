@@ -110,18 +110,18 @@ config = build_sft_config(
 )
 
 print(f"  Method:        {config.method}")
-print(f"  Base model:    {config.base_model}")
-print(f"  LoRA:          r={config.lora_r}, alpha={config.lora_alpha}")
-print(f"  Target modules: {config.target_modules}")
-print(f"  Epochs:        {config.num_epochs}")
-print(f"  Batch size:    {config.batch_size}")
-print(f"  Learning rate: {config.learning_rate}")
-print(f"  Output dir:    {config.output_dir}")
+print(f"  Base model:    {config.base_model_id}")
+print(f"  LoRA:          r={config.lora.rank}, alpha={config.lora.alpha}")
+print(f"  Target modules: {config.lora.target_modules}")
+print(f"  Epochs:        {config.sft.num_train_epochs}")
+print(f"  Batch size:    {config.sft.per_device_train_batch_size}")
+print(f"  Learning rate: {config.sft.learning_rate}")
+print(f"  Output dir:    {config.experiment_dir}")
 
 # ── Checkpoint 2 ─────────────────────────────────────────────────────────
 assert config.method == "sft", "Task 2: method should be 'sft'"
-assert config.lora_r == 16, "Task 2: LoRA rank should be 16"
-assert "q_proj" in config.target_modules, "Task 2: q_proj must be a target module"
+assert config.lora.rank == 16, "Task 2: LoRA rank should be 16"
+assert "q_proj" in config.lora.target_modules, "Task 2: q_proj must be a target module"
 print("✓ Checkpoint 2 passed — AlignmentConfig built\n")
 
 
@@ -153,34 +153,48 @@ async def run_sft_and_register() -> dict:
             "adapter_path": str(OUTPUT_DIR / "sft_output" / "adapter"),
         }
     else:
-        from kailash_align import AdapterRegistry, AlignmentPipeline
+        from kailash_align import (
+            AdapterRegistry,
+            AdapterSignature,
+            AlignmentPipeline,
+        )
 
         pipeline = AlignmentPipeline(config)
         print("  Running SFT training (this may take several minutes)...")
         result = await pipeline.train(train_data=train_data, eval_data=eval_data)
+        # AlignmentResult.training_metrics is a dict in 0.6.0 — final_loss /
+        # eval_loss / training_time_seconds live there, not as direct attrs.
+        train_metrics = result.training_metrics
         metrics = {
-            "final_loss": result.final_loss,
-            "eval_loss": result.eval_loss,
-            "training_time_seconds": result.training_time_seconds,
+            "final_loss": train_metrics["final_loss"],
+            "eval_loss": train_metrics["eval_loss"],
+            "training_time_seconds": train_metrics.get("training_time_seconds", 0),
             "adapter_path": result.adapter_path,
         }
         print(f"  Final loss:    {metrics['final_loss']:.4f}")
         print(f"  Eval loss:     {metrics['eval_loss']:.4f}")
         print(f"  Training time: {metrics['training_time_seconds']:.0f}s")
 
-        # Register the trained adapter
+        # Register the trained adapter (kailash-align 0.6.0+ API):
+        # AdapterSignature bundles base + adapter_type + training_method;
+        # register_adapter returns an AdapterVersion dataclass.
         registry = AdapterRegistry()
-        adapter_id = await registry.register(
+        signature = AdapterSignature(
+            base_model_id=config.base_model_id,
+            adapter_type="lora",
+            training_method="sft",
+        )
+        version = await registry.register_adapter(
             name="imdb_sentiment_sft_v1",
-            base_model=config.base_model,
-            method="sft_lora",
             adapter_path=metrics["adapter_path"],
-            metrics={
+            signature=signature,
+            training_metrics={
                 "final_loss": metrics["final_loss"],
                 "eval_loss": metrics["eval_loss"],
             },
             tags=["imdb", "sentiment", "lora-r16"],
         )
+        adapter_id = f"{version.adapter_name}:v{version.version}"
         metrics["adapter_id"] = adapter_id
         print(f"  Registered as: {adapter_id}")
 

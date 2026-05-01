@@ -53,7 +53,7 @@ async def cot_once(text: str) -> tuple[str, float, float]:
     """One CoT sample."""
     # TODO: Build a CoT prompt (positive/negative, think step by step).
     prompt = ____
-    # TODO: run_delegate, normalise, return (label, cost, elapsed)
+    # TODO: run_delegate, normalise, return (label, tokens, elapsed)
     ____
 
 
@@ -62,7 +62,7 @@ async def self_consistency_classify(
 ) -> tuple[str, list[str], float, float]:
     """Sample N_SAMPLES CoT paths in parallel, return majority vote.
 
-    Returns (majority_label, votes, total_cost, max_elapsed).
+    Returns (majority_label, votes, total_tokens, max_elapsed).
     """
     # TODO: Build a list of N_SAMPLES cot_once coroutines and await them
     # in parallel with asyncio.gather. Collect votes, sum costs, take max elapsed.

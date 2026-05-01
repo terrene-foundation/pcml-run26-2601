@@ -407,7 +407,7 @@ print(
 # and outputs a fixed prior). It shows up in the Blood Test as
 # gradients vanishing specifically on `fc_mu`/`fc_logvar` — the
 # model stops routing information through the latent.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

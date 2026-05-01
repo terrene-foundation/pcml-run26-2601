@@ -139,8 +139,8 @@ async def _run_efficiency_trial(
     #   7. Train for EFF_EPOCHS: forward -> cross_entropy -> backward -> step
     #   8. Evaluate on full val_loader: count correct/total
     #   9. Return (accuracy, n_samples)
-    # Hint: async with tracker.run(experiment_name=exp_name, run_name=run_name) as ctx:
-    # Hint: await ctx.log_params({...}), await ctx.log_metric("val_acc", acc)
+    # Hint: async with tracker.track(experiment=exp_name, run_name=run_name) as run:
+    # Hint: await run.log_params({...}), await run.log_metric("val_acc", acc)
     n_samples = int(len(train_set) * frac)
     ____
 
@@ -364,9 +364,9 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — five instruments before Visualise
 # ══════════════════════════════════════════════════════════════════
-# Reference: `shared/mlfp05/diagnostics.py` — see gold standard
+# Reference: `kailash_ml.diagnostics` (via `kailash-ml`) — see gold standard
 # `solutions/ex_1/01_standard_ae.py` for the full pattern.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

@@ -35,17 +35,13 @@ import numpy as np
 from dataflow import DataFlow
 from kailash.runtime import LocalRuntime
 from kailash.workflow.builder import WorkflowBuilder
+from kailash_ml import HyperparameterSearch, TrainingPipeline
 from kailash_ml.engines.hyperparameter_search import (
-    HyperparameterSearch,
     ParamDistribution,
     SearchConfig,
     SearchSpace,
 )
-from kailash_ml.engines.training_pipeline import (
-    EvalSpec,
-    ModelSpec,
-    TrainingPipeline,
-)
+from kailash_ml.engines.training_pipeline import EvalSpec, ModelSpec
 from kailash_ml.interop import to_sklearn_input
 
 from shared.mlfp03.ex_7 import (
@@ -355,6 +351,9 @@ async def orchestrated_run() -> dict:
             "version_id": version_id,
             "drift": drift,
             "audit": audit,
+            "report_model": report_model,
+            "X_test": X_test,
+            "y_test": y_test,
         }
     finally:
         await conn.close()
@@ -412,6 +411,45 @@ print(
     f"\n  Plus: a reproducibility certificate for run_id={RUN_ID[:8]}"
     f"\n  that maps 1:1 to the PipelineAuditEntry rows above."
 )
+
+
+# ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This orchestrated capstone wired WorkflowBuilder, DataFlow @db.model,
+# HyperparameterSearch (Bayesian), TrainingPipeline, ModelRegistry, and a
+# branching quality gate from primitives — every stage tagged to one
+# run_id, every transition written to an audit table, every metric
+# reproduced under the same seed. The kailash-ml SDK packages the
+# diagnostic surface (per-class metrics, class-balance severity, confusion
+# matrix) into a single call — the foundation every regulator-facing
+# audit gate evaluates against.
+#
+# Destination-first: when the journey is internalised, the SDK is one line.
+
+from kailash_ml import diagnose
+
+report_model = orchestration["report_model"]
+X_test = orchestration["X_test"]
+y_test = orchestration["y_test"]
+
+# `kind="classical_classifier"` dispatches to the sklearn ClassifierMixin
+# adapter. The pipeline's fitted LightGBM classifier implements the
+# interface — exactly the model that passed the AUC-PR quality gate above.
+report = diagnose(
+    report_model,
+    kind="classical_classifier",
+    data=(X_test, y_test),
+    show=False,
+)
+print()
+print("  km.diagnose model    : orchestrated credit-default classifier")
+print(f"  km.diagnose metrics  : {report.metrics}")
+print(f"  km.diagnose severity : {report.severity}")
+print()
+print("km.diagnose: 1 call -> the diagnostic surface every audit gate")
+print("evaluates against. Destination-first: when the journey is")
+print("internalised, the SDK is one line.")
 
 
 # ════════════════════════════════════════════════════════════════════════

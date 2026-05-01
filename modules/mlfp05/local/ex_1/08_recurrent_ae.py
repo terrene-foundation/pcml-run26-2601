@@ -456,7 +456,7 @@ print(
 # LSTMs suffer a unique flavour of vanishing gradients: gradients
 # don't vanish through DEPTH (we only have 1 recurrent layer here)
 # but through TIME. The Blood Test here is especially informative.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

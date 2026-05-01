@@ -20,10 +20,10 @@ event stream.
 Quick start::
 
     from shared.mlfp06.diagnostics import AgentDiagnostics
-    from kaizen_agents import Delegate
+    from shared.mlfp06._ollama_bootstrap import make_delegate
 
     agent_diag = AgentDiagnostics()
-    delegate = Delegate(model=os.environ["OPENAI_PROD_MODEL"], tools=[...])
+    delegate = make_delegate(tools=[...])  # Ollama-backed; no API keys
 
     trace = await agent_diag.capture_run(delegate, "Research and summarise ...")
     agent_diag.plot_trace(trace.run_id).show()

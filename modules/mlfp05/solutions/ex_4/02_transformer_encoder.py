@@ -225,7 +225,13 @@ class TransformerClassifier(nn.Module):
             dropout=dropout,
             batch_first=True,
         )
-        self.encoder = nn.TransformerEncoder(layer, num_layers=n_layers)
+        # enable_nested_tensor=False: PyTorch's nested-tensor optimization is
+        # not supported on Apple Silicon MPS (raises NotImplementedError on
+        # `_nested_tensor_from_mask_left_aligned`). Disabling here ensures the
+        # lesson runs on every backend; pedagogical impact is zero.
+        self.encoder = nn.TransformerEncoder(
+            layer, num_layers=n_layers, enable_nested_tensor=False
+        )
         self.head_drop = nn.Dropout(dropout)
         self.head = nn.Linear(d_model, n_classes)
 
@@ -270,16 +276,13 @@ transformer_losses, transformer_accs = train_model(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — Transformer (attention + residual stack)
 # ══════════════════════════════════════════════════════════════════
-from shared.mlfp05.diagnostics import diagnose_classifier
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (Transformer Encoder) ──")
-diag, findings = diagnose_classifier(
+report = diagnose(
     transformer_model,
-    val_loader,
-    title="Transformer Encoder (AG News)",
-    n_batches=8,
-    train_losses=transformer_losses,
-    val_losses=[1.0 - a for a in transformer_accs],
+    kind="dl",
+    data=val_loader,
     show=False,
 )
 

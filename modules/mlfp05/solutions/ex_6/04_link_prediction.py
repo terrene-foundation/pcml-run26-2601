@@ -231,9 +231,9 @@ link_aucs: list[float] = []
 
 
 async def _train_link_predictor_async():
-    """Train the link predictor under a tracker.run(...) context."""
-    async with tracker.run(experiment_name=exp_name, run_name="link_prediction") as ctx:
-        await ctx.log_params(
+    """Train the link predictor under a tracker.track(...) context."""
+    async with tracker.track(experiment=exp_name, run_name="link_prediction") as run:
+        await run.log_params(
             {
                 "task": "link_prediction",
                 "hidden_dim": str(HIDDEN_DIM),
@@ -278,7 +278,7 @@ async def _train_link_predictor_async():
                 auc_approx = (p_sample > n_sample_scores).float().mean().item()
             link_aucs.append(auc_approx)
 
-            await ctx.log_metrics(
+            await run.log_metrics(
                 {"link_loss": loss.item(), "link_auc_approx": auc_approx},
                 step=epoch + 1,
             )
@@ -289,7 +289,7 @@ async def _train_link_predictor_async():
                     f"loss={loss.item():.4f}  auc_approx={auc_approx:.3f}"
                 )
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {
                 "final_link_loss": link_losses[-1],
                 "final_link_auc": link_aucs[-1],
@@ -583,9 +583,9 @@ asyncio.run(conn.close())
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — five instruments before Visualise
 # ══════════════════════════════════════════════════════════════════
-# Reference: `shared/mlfp05/diagnostics.py` — see gold standard
+# Reference: `kailash_ml.diagnostics` (via `kailash-ml`) — see gold standard
 # `solutions/ex_1/01_standard_ae.py` for the full pattern.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

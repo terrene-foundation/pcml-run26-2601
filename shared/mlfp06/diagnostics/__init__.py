@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """LLM Observatory — six clinical lenses for LLM / agent / RAG / governance systems.
 
-Mirrors the M5 Doctor's Bag (``shared.mlfp05.diagnostics.DLDiagnostics``) for
+Mirrors the M5 Doctor's Bag (``kailash_ml.diagnostics.DLDiagnostics``) for
 the M6 problem domain. A single :class:`LLMObservatory` facade composes six
 lens classes that each answer exactly one diagnostic question:
 

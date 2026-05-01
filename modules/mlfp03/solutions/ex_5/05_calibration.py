@@ -188,8 +188,12 @@ for label, bins in [
     ("Platt", bins_platt),
     ("Isotonic", bins_iso),
 ]:
-    mean_pred = [b["mean_predicted"] for b in bins if b["count"] > 0]
-    frac_pos = [b["fraction_positives"] for b in bins if b["count"] > 0]
+    # bins is a polars DataFrame with columns mean_pred / empirical_rate /
+    # count (see shared.mlfp03.ex_5.reliability_bins). Filter out empty
+    # bins, then extract the two scatter columns.
+    nonempty = bins.filter(pl.col("count") > 0)
+    mean_pred = nonempty["mean_pred"].to_list()
+    frac_pos = nonempty["empirical_rate"].to_list()
     fig.add_trace(go.Scatter(x=mean_pred, y=frac_pos, mode="lines+markers", name=label))
 fig.update_layout(
     title="Reliability Diagram: predicted probability vs observed default rate",
@@ -305,6 +309,34 @@ print(
     - You have verified it IMPROVES calibration on a holdout set
 """
 )
+
+
+# ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson built calibration from primitives — Platt scaling, isotonic
+# regression, cost-aware threshold optimisation. The kailash-ml SDK
+# packages the diagnostic surface (per-class metrics, class-balance
+# severity, confusion matrix) into a single call.
+#
+# Destination-first: when the journey is internalised, the SDK is one line.
+
+from kailash_ml import diagnose
+
+# `kind="classical_classifier"` dispatches to the sklearn ClassifierMixin
+# adapter. CalibratedClassifierCV implements the ClassifierMixin interface.
+# Use the isotonic variant — typically the better calibrator for >1k samples.
+report = diagnose(
+    isotonic, kind="classical_classifier", data=(X_test, y_test), show=False
+)
+print()
+print("  km.diagnose model    : Isotonic-calibrated LightGBM")
+print(f"  km.diagnose metrics  : {report.metrics}")
+print(f"  km.diagnose severity : {report.severity}")
+print()
+print("km.diagnose: 1 call -> the same diagnostic surface the lesson body")
+print("hand-rolled across Platt + Isotonic. Destination-first: when the")
+print("journey is internalised, the SDK is one line.")
 
 
 # ════════════════════════════════════════════════════════════════════════

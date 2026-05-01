@@ -26,12 +26,11 @@ from shared.kailash_helpers import setup_environment
 
 setup_environment()
 
-MODEL = os.environ.get("DEFAULT_LLM_MODEL", os.environ.get("OPENAI_PROD_MODEL"))
-if not MODEL:
-    raise EnvironmentError(
-        "Set DEFAULT_LLM_MODEL or OPENAI_PROD_MODEL in .env before running "
-        "MLFP06 Exercise 6 — every specialist agent needs an LLM model."
-    )
+from shared.mlfp06._ollama_bootstrap import DEFAULT_CHAT_MODEL, OLLAMA_BASE_URL
+
+MODEL = DEFAULT_CHAT_MODEL
+LLM_PROVIDER_DEFAULT = os.environ.get("LLM_PROVIDER", "ollama")
+LLM_BASE_URL_DEFAULT = os.environ.get("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
 
 # Output directory for all visualisation/trace artifacts
 OUTPUT_DIR = Path("outputs") / "ex6_multi_agent"
@@ -177,32 +176,36 @@ class InterpretationSignature(Signature):
 
 @dataclass
 class FactualConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = LLM_PROVIDER_DEFAULT
     model: str = MODEL
+    base_url: str = LLM_BASE_URL_DEFAULT
     temperature: float = 0.2
     budget_limit_usd: float = 1.0
 
 
 @dataclass
 class SemanticConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = LLM_PROVIDER_DEFAULT
     model: str = MODEL
+    base_url: str = LLM_BASE_URL_DEFAULT
     temperature: float = 0.2
     budget_limit_usd: float = 1.0
 
 
 @dataclass
 class StructuralConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = LLM_PROVIDER_DEFAULT
     model: str = MODEL
+    base_url: str = LLM_BASE_URL_DEFAULT
     temperature: float = 0.2
     budget_limit_usd: float = 1.0
 
 
 @dataclass
 class SynthesisConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = LLM_PROVIDER_DEFAULT
     model: str = MODEL
+    base_url: str = LLM_BASE_URL_DEFAULT
     temperature: float = 0.2
     # Supervisor gets a larger budget — it reasons over all specialist outputs.
     budget_limit_usd: float = 2.0
@@ -210,8 +213,9 @@ class SynthesisConfig:
 
 @dataclass
 class InterpretationConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = LLM_PROVIDER_DEFAULT
     model: str = MODEL
+    base_url: str = LLM_BASE_URL_DEFAULT
     temperature: float = 0.2
     budget_limit_usd: float = 1.0
 

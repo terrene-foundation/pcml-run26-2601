@@ -68,21 +68,27 @@ def load_hdb_resale() -> pl.DataFrame:
 
 
 async def setup_feature_store() -> tuple[Any, Any, Any, bool]:
-    """Create (factory, FeatureStore, ExperimentTracker, has_backend).
+    """Create (conn, FeatureStore, ExperimentTracker, has_backend) for kailash-ml 1.1.1.
 
     Returns ``has_backend=False`` if the infrastructure is unavailable.
     Callers handle the degraded path by running the Polars-only versions
     of each operation.
+
+    Note: the first tuple element is now a ``ConnectionManager`` rather than
+    the old ``StoreFactory`` — kailash-ml's ExperimentTracker no longer
+    accepts a positional store object; it constructs its own through the
+    ``store_url`` factory. We still return a ConnectionManager so FeatureStore
+    has the connection it needs.
     """
     try:
-        from kailash.infrastructure import StoreFactory
-        from kailash_ml import FeatureStore
-        from kailash_ml.engines.experiment_tracker import ExperimentTracker
+        from kailash.db import ConnectionManager
+        from kailash_ml import ExperimentTracker, FeatureStore
 
-        factory = StoreFactory(FEATURE_STORE_URL)
-        fs = FeatureStore(factory, table_prefix=FEATURE_TABLE_PREFIX)
-        tracker = ExperimentTracker(factory)
-        return factory, fs, tracker, True
+        conn = ConnectionManager(FEATURE_STORE_URL)
+        await conn.initialize()
+        fs = FeatureStore(conn, table_prefix=FEATURE_TABLE_PREFIX)
+        tracker = await ExperimentTracker.create(store_url=FEATURE_STORE_URL)
+        return conn, fs, tracker, True
     except Exception as exc:  # noqa: BLE001 — degrade gracefully
         print(
             f"  [warn] FeatureStore backend unavailable "

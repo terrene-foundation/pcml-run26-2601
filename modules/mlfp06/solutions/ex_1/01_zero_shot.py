@@ -74,7 +74,7 @@ load_dotenv()
 
 
 async def zero_shot_classify(text: str) -> tuple[str, float, float]:
-    """Classify sentiment with zero examples. Returns (label, cost_usd, elapsed_s)."""
+    """Classify sentiment with zero examples. Returns (label, total_tokens, elapsed_s)."""
     prompt = f"""Classify the sentiment of the following movie review snippet
 into exactly one category.
 
@@ -84,8 +84,8 @@ Review: "{text[:800]}"
 
 Respond with ONLY the category name, nothing else."""
 
-    response, cost, elapsed = await run_delegate(prompt)
-    return normalise_label(response), cost, elapsed
+    response, tokens, elapsed = await run_delegate(prompt)
+    return normalise_label(response), tokens, elapsed
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -101,7 +101,7 @@ async def evaluate() -> list[dict]:
     texts = docs["text"].to_list()
     labels = docs["label"].to_list()
     for i, (text, true_label) in enumerate(zip(texts, labels)):
-        pred, cost, elapsed = await zero_shot_classify(text)
+        pred, tokens, elapsed = await zero_shot_classify(text)
         correct = pred == true_label
         results.append(
             {
@@ -109,7 +109,7 @@ async def evaluate() -> list[dict]:
                 "pred": pred,
                 "true": true_label,
                 "correct": correct,
-                "cost": cost,
+                "tokens": tokens,
                 "elapsed": elapsed,
             }
         )

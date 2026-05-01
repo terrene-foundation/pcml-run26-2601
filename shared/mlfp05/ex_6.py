@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import pickle
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,9 +23,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from kailash.db import ConnectionManager
-from kailash_ml import ModelVisualizer
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
-from kailash_ml.engines.model_registry import ModelRegistry
+from kailash_ml import ExperimentTracker, ModelVisualizer
+from kailash_ml import ModelRegistry
 from kailash_ml.types import MetricSpec
 
 from shared.kailash_helpers import get_device, setup_environment
@@ -64,7 +64,9 @@ def load_cora() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, str, in
     from torch_geometric.datasets import Planetoid
 
     dataset = Planetoid(root=str(DATA_DIR), name="Cora")
-    data = dataset[0]
+    # torch_geometric.data.Data has dynamic attributes (num_nodes/x/y/edge_index);
+    # use Any to avoid type-checker false positives without losing runtime fidelity.
+    data: Any = dataset[0]
     n = data.num_nodes
     X_np = data.x.numpy().astype(np.float32)
     y_np = data.y.numpy().astype(np.int64)
@@ -187,24 +189,17 @@ def load_graph_data() -> dict:
 
 
 async def _setup_engines():
-    conn = ConnectionManager("sqlite:///mlfp05_gnns.db")
+    """Open kailash-ml 1.1.1 tracker + registry. 5-tuple preserved."""
+    # Schema-conflict workaround (kailash-ml 1.5.x): ExperimentTracker
+    # and ModelRegistry use incompatible _kml_model_versions schemas.
+    # Route them to separate sqlite files until upstream fixes the conflict.
+    db = "sqlite:///mlfp05_gnns.db"
+    registry_db = "sqlite:///mlfp05_gnns_registry.db"
+    tracker = await ExperimentTracker.create(store_url=db)
+    conn = ConnectionManager(registry_db)
     await conn.initialize()
-
-    tracker = ExperimentTracker(conn)
-    exp_name = await tracker.create_experiment(
-        name="m5_gnns",
-        description="GNN architectures (GCN, GAT, GraphSAGE) on Cora citation network",
-    )
-
-    try:
-        registry = ModelRegistry(conn)
-        has_registry = True
-    except Exception as e:
-        registry = None
-        has_registry = False
-        print(f"  Note: ModelRegistry setup skipped ({e})")
-
-    return conn, tracker, exp_name, registry, has_registry
+    registry = ModelRegistry(conn)
+    return conn, tracker, "m5_gnns", registry, True
 
 
 def setup_engines() -> tuple:
@@ -261,7 +256,7 @@ async def _train_node_classifier_async(
     lr: float = 1e-2,
     weight_decay: float = 5e-4,
 ) -> tuple[list[float], list[float], list[float]]:
-    """Async core — uses the modern ``tracker.run(...)`` context manager."""
+    """Async core — uses the kailash-ml 1.1.1 ``tracker.track(...)`` context manager."""
     X = graph_data["X"]
     y = graph_data["y"]
     train_mask = graph_data["train_mask"]
@@ -281,8 +276,8 @@ async def _train_node_classifier_async(
     val_accs: list[float] = []
     test_accs: list[float] = []
 
-    async with tracker.run(experiment_name=exp_name, run_name=name) as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name=name) as run:
+        await run.log_params(
             {
                 "model_type": name,
                 "hidden_dim": str(hidden_dim),
@@ -313,7 +308,7 @@ async def _train_node_classifier_async(
             val_accs.append(v_acc)
             test_accs.append(t_acc)
 
-            await ctx.log_metrics(
+            await run.log_metrics(
                 {
                     "train_loss": loss.item(),
                     "val_accuracy": v_acc,
@@ -328,7 +323,7 @@ async def _train_node_classifier_async(
                     f"loss={loss.item():.4f}  val_acc={v_acc:.3f}  test_acc={t_acc:.3f}"
                 )
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {
                 "final_loss": train_losses[-1],
                 "final_val_accuracy": val_accs[-1],
@@ -360,6 +355,7 @@ def plot_training_curves(
         x_label="Epoch",
         y_label=y_label,
     )
+    fig.update_layout(title=title)
     filepath = OUTPUT_DIR / filename
     fig.write_html(str(filepath))
     print(f"  Saved: {filepath}")
@@ -378,7 +374,7 @@ def plot_node_embeddings(
     should cluster together if the GNN learned meaningful representations.
     """
     emb_centered = embeddings - embeddings.mean(axis=0, keepdims=True)
-    U, S, Vt = np.linalg.svd(emb_centered, full_matrices=False)
+    Vt = np.linalg.svd(emb_centered, full_matrices=False)[2]
     coords = emb_centered @ Vt.T[:, :2]
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
@@ -502,7 +498,7 @@ def plot_attention_weights(
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 5))
     bar_colors = [plt.cm.get_cmap("tab10")(labels[n] % 10) for n in top_neighbours]
-    bars = ax.barh(
+    ax.barh(
         range(len(top_neighbours)),
         top_weights,
         color=bar_colors,

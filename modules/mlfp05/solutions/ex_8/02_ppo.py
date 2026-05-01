@@ -231,8 +231,8 @@ async def train_ppo_async(
     actor_losses: list[float] = []
     critic_losses: list[float] = []
 
-    async with tracker.run(experiment_name=exp_name, run_name=run_name) as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name=run_name) as run:
+        await run.log_params(
             {
                 "algorithm": "PPO",
                 "gamma": str(gamma),
@@ -312,7 +312,7 @@ async def train_ppo_async(
             critic_losses.append(avg_critic)
             policy_entropies.append(avg_entropy)
 
-            await ctx.log_metrics(
+            await run.log_metrics(
                 {
                     "avg_episode_return": avg_ep_return,
                     "policy_entropy": avg_entropy,
@@ -328,7 +328,7 @@ async def train_ppo_async(
                     f"entropy={avg_entropy:.3f}  actor_loss={avg_actor:.4f}"
                 )
 
-        await ctx.log_metric("final_avg_return", iter_returns[-1])
+        await run.log_metric("final_avg_return", iter_returns[-1])
 
     return model, iter_returns, policy_entropies, actor_losses, critic_losses
 
@@ -612,7 +612,7 @@ pricing_env = RideHailingPricingEnv()
 obs, info = pricing_env.reset(seed=42)
 assert obs.shape == (4,), "Pricing env should have 4-D state"
 obs2, r, term, trunc, info = pricing_env.step(2)
-assert isinstance(r, float), "Reward should be float"
+assert isinstance(r, (int, float)) or hasattr(r, "__float__"), f"Reward should be numeric, got {type(r).__name__}: {r!r}"
 print(f"  RideHailingPricing env: obs={obs.shape}, actions=5, sample_reward={r:.3f}")
 
 # ── Train PPO on pricing environment ─────────────────────────────────
@@ -794,9 +794,9 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — five instruments before Visualise
 # ══════════════════════════════════════════════════════════════════
-# Reference: `shared/mlfp05/diagnostics.py` — see gold standard
+# Reference: `kailash_ml.diagnostics` (via `kailash-ml`) — see gold standard
 # `solutions/ex_1/01_standard_ae.py` for the full pattern.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

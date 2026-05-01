@@ -241,6 +241,34 @@ RECOMMENDATIONS:
 
 
 # ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson built a fairness audit from primitives — disparate impact
+# ratio, equal opportunity difference, predictive parity — to internalise
+# the regulatory framing. The kailash-ml SDK packages the standard
+# diagnostic surface (per-class metrics, severity heuristics, confusion
+# matrix) into a single call; group-conditional fairness metrics layer on
+# top of that base.
+#
+# Destination-first: when the journey is internalised, the SDK is one line.
+
+from kailash_ml import diagnose
+
+# `kind="classical_classifier"` dispatches to the sklearn ClassifierMixin
+# adapter. The fairness audit's underlying classifier is the bundle's
+# `model` already loaded for the audit.
+report = diagnose(model, kind="classical_classifier", data=(X_test, y_test), show=False)
+print()
+print("  km.diagnose model    : audited credit-default classifier")
+print(f"  km.diagnose metrics  : {report.metrics}")
+print(f"  km.diagnose severity : {report.severity}")
+print()
+print("km.diagnose: 1 call for the base diagnostic surface; the fairness")
+print("metrics above sit on top of it. Destination-first: when the")
+print("journey is internalised, the SDK is one line.")
+
+
+# ════════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ════════════════════════════════════════════════════════════════════════
 print_section("WHAT YOU'VE MASTERED")

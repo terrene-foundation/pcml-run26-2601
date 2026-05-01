@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import math
-import pickle
 from collections import Counter
 from pathlib import Path
 import numpy as np
@@ -31,10 +30,9 @@ from torch.utils.data import DataLoader, TensorDataset
 import plotly.graph_objects as go
 
 from kailash.db import ConnectionManager
-from kailash_ml import ModelVisualizer
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
-from kailash_ml.engines.model_registry import ModelRegistry
-from kailash_ml.bridge.onnx_bridge import OnnxBridge
+from kailash_ml import ExperimentTracker, ModelVisualizer
+from kailash_ml import ModelRegistry
+from kailash_ml import OnnxBridge
 from shared.kailash_helpers import get_device, setup_environment
 
 # ════════════════════════════════════════════════════════════════════════
@@ -185,25 +183,17 @@ def prepare_dataloaders(
 async def _setup_engines_async() -> (
     tuple[ConnectionManager, ExperimentTracker, str, ModelRegistry | None, bool]
 ):
-    """Initialise ExperimentTracker + ModelRegistry (async)."""
-    conn = ConnectionManager("sqlite:///mlfp05_transformers.db")
+    """Initialise ExperimentTracker (kailash-ml 1.1.1 factory) + ModelRegistry."""
+    # Schema-conflict workaround (kailash-ml 1.5.x): ExperimentTracker
+    # and ModelRegistry use incompatible _kml_model_versions schemas.
+    # Route them to separate sqlite files until upstream fixes the conflict.
+    db = "sqlite:///mlfp05_transformers.db"
+    registry_db = "sqlite:///mlfp05_transformers_registry.db"
+    tracker = await ExperimentTracker.create(store_url=db)
+    conn = ConnectionManager(registry_db)
     await conn.initialize()
-
-    tracker = ExperimentTracker(conn)
-    exp_name = await tracker.create_experiment(
-        name="m5_transformers",
-        description="LSTM vs Transformer vs BERT on AG News (120K headlines)",
-    )
-
-    try:
-        registry = ModelRegistry(conn)
-        has_registry = True
-    except Exception as e:
-        registry = None
-        has_registry = False
-        print(f"  Note: ModelRegistry setup skipped ({e})")
-
-    return conn, tracker, exp_name, registry, has_registry
+    registry = ModelRegistry(conn)
+    return conn, tracker, "m5_transformers", registry, True
 
 
 def setup_engines() -> tuple[
@@ -240,7 +230,7 @@ async def train_model_async(
 ) -> tuple[list[float], list[float]]:
     """Train a PyTorch classifier and log every epoch to ExperimentTracker.
 
-    Uses the modern ``tracker.run(...)`` async context manager -- bulk
+    Uses the modern ``tracker.track(...)`` async context manager -- bulk
     param logging, per-step metrics, automatic COMPLETED/FAILED state.
     """
     model.to(DEVICE)
@@ -252,8 +242,8 @@ async def train_model_async(
     best_state: dict | None = None
     param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    async with tracker.run(experiment_name=exp_name, run_name=model_name) as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name=model_name) as run:
+        await run.log_params(
             {
                 "model_type": model_name,
                 "epochs": str(epochs),
@@ -290,7 +280,7 @@ async def train_model_async(
                 acc = correct / total
                 val_accs.append(acc)
 
-            await ctx.log_metrics(
+            await run.log_metrics(
                 {"train_loss": epoch_loss, "val_accuracy": acc},
                 step=epoch + 1,
             )
@@ -304,7 +294,7 @@ async def train_model_async(
                 f"loss={epoch_loss:.4f}  val_acc={acc:.3f}"
             )
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {
                 "best_val_accuracy": best_acc,
                 "final_train_loss": train_losses[-1],

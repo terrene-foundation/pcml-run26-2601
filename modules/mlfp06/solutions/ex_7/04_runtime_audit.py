@@ -94,7 +94,7 @@ print("=" * 70)
 print("TASK 1: GovernedSupervisor — three clearance tiers")
 print("=" * 70)
 
-model = default_model_name() or "gpt-4o-mini"
+model = default_model_name()
 
 governed_public = GovernedSupervisor(
     model=model,

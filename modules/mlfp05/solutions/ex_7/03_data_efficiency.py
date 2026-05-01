@@ -156,8 +156,8 @@ async def _run_efficiency_trial(
     opt = torch.optim.Adam(params, lr=1e-3)
 
     run_name = f"{model_name}_{int(frac * 100)}pct"
-    async with tracker.run(experiment_name=exp_name, run_name=run_name) as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name=run_name) as run:
+        await run.log_params(
             {
                 "model_type": model_name,
                 "data_fraction": str(frac),
@@ -186,7 +186,7 @@ async def _run_efficiency_trial(
                 total += int(yb.size(0))
         acc = correct / total
 
-        await ctx.log_metric("val_acc", acc)
+        await run.log_metric("val_acc", acc)
 
     return acc, n_samples
 
@@ -467,9 +467,9 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — five instruments before Visualise
 # ══════════════════════════════════════════════════════════════════
-# Reference: `shared/mlfp05/diagnostics.py` — see gold standard
+# Reference: `kailash_ml.diagnostics` (via `kailash-ml`) — see gold standard
 # `solutions/ex_1/01_standard_ae.py` for the full pattern.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

@@ -168,6 +168,34 @@ print(
 
 
 # ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson built calibration from primitives — Platt scaling, isotonic
+# regression, cost-aware threshold optimisation. The kailash-ml SDK
+# packages the diagnostic surface (per-class metrics, class-balance
+# severity, confusion matrix) into a single call.
+#
+# Destination-first: when the journey is internalised, the SDK is one line.
+
+from kailash_ml import diagnose
+
+# `kind="classical_classifier"` dispatches to the sklearn ClassifierMixin
+# adapter. CalibratedClassifierCV implements the ClassifierMixin interface.
+# Use the isotonic variant — typically the better calibrator for >1k samples.
+report = diagnose(
+    isotonic, kind="classical_classifier", data=(X_test, y_test), show=False
+)
+print()
+print("  km.diagnose model    : Isotonic-calibrated LightGBM")
+print(f"  km.diagnose metrics  : {report.metrics}")
+print(f"  km.diagnose severity : {report.severity}")
+print()
+print("km.diagnose: 1 call -> the same diagnostic surface the lesson body")
+print("hand-rolled across Platt + Isotonic. Destination-first: when the")
+print("journey is internalised, the SDK is one line.")
+
+
+# ════════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ════════════════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)

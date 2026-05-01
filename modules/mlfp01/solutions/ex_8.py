@@ -47,7 +47,7 @@ import os
 
 import polars as pl
 from kailash_ml import DataExplorer, ModelVisualizer, PreprocessingPipeline
-from kailash_ml.engines.data_explorer import AlertConfig
+from kailash_ml import AlertConfig
 
 from shared import MLFPDataLoader
 

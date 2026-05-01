@@ -38,8 +38,13 @@ from sklearn.cluster import DBSCAN, KMeans, SpectralClustering
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 
-from kailash_ml import ModelVisualizer
-from kailash_ml.engines.automl_engine import AutoMLConfig, AutoMLEngine
+from kailash_ml import AutoMLEngine, ModelVisualizer
+
+# AutoMLConfig is not in kailash_ml.__all__ in 1.5.x; import from the
+# automl.engine submodule. AutoMLEngine remains a top-level export.
+from kailash_ml.automl.engine import (
+    AutoMLConfig,
+)  # pyright: ignore[reportMissingImports]
 
 from shared.mlfp04.ex_1 import (
     RANDOM_STATE,
@@ -180,10 +185,12 @@ async def run_automl() -> AutoMLConfig:
     """Build an AutoMLEngine config for clustering comparison."""
     config = AutoMLConfig(
         task_type="clustering",
-        metric_to_optimize="silhouette",
+        # kailash-ml 1.5.x renamed `metric_to_optimize` -> `metric_name`
+        # and `search_n_trials` -> `max_trials`. Same semantics.
+        metric_name="silhouette",
         direction="maximize",
         search_strategy="random",
-        search_n_trials=20,
+        max_trials=20,
         agent=False,  # ← first gate: explicit opt-in
         max_llm_cost_usd=1.0,  # ← second gate: hard cost cap
     )
@@ -195,7 +202,7 @@ config = asyncio.run(run_automl())
 
 print("  AutoMLEngine config:")
 print(f"    task_type         = {config.task_type}")
-print(f"    metric_to_optimize= {config.metric_to_optimize}")
+print(f"    metric_name       = {config.metric_name}")
 print(f"    agent             = {config.agent}  (False = no LLM)")
 print(f"    max_llm_cost_usd  = {config.max_llm_cost_usd}")
 print("  agent=True requires BOTH the flag AND kailash-ml[agents] installed.")

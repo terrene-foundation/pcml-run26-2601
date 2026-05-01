@@ -143,7 +143,7 @@ dae_losses = train_variant(
 # loss mirrors that. Expect HEALTHIER activations than vanilla AE:
 # noise acts as implicit regularisation, keeping ReLUs "alive"
 # across the batch (dead-neuron % should drop vs 01/02).
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

@@ -204,8 +204,8 @@ async def train_wgan_gp(
 
     epoch_snapshots[0] = copy.deepcopy(G.state_dict())
 
-    async with tracker.run(experiment_name=exp_name, run_name="wgan_gp") as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name="wgan_gp") as run:
+        await run.log_params(
             {
                 "architecture": "WGAN_GP_MLP",
                 "latent_dim": str(LATENT_DIM),
@@ -249,7 +249,7 @@ async def train_wgan_gp(
             avg_g, avg_d = float(np.mean(eg)), float(np.mean(ed))
             g_losses.append(avg_g)
             d_losses.append(avg_d)
-            await ctx.log_metrics({"g_loss": avg_g, "d_loss": avg_d}, step=epoch + 1)
+            await run.log_metrics({"g_loss": avg_g, "d_loss": avg_d}, step=epoch + 1)
             print(
                 f"  [WGAN-GP] epoch {epoch+1:2d}/{epochs}  "
                 f"critic={avg_d:.3f}  G={avg_g:.3f}"
@@ -258,7 +258,7 @@ async def train_wgan_gp(
             if (epoch + 1) in {1, 5, 10, 15, 20}:
                 epoch_snapshots[epoch + 1] = copy.deepcopy(G.state_dict())
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {"final_g_loss": g_losses[-1], "final_d_loss": d_losses[-1]}
         )
 
@@ -289,7 +289,7 @@ print("\n--- Checkpoint 2 passed --- WGAN-GP trained\n")
 # collapse signature in the activations. The Stethoscope should
 # show critic loss decreasing smoothly as the Wasserstein distance
 # shrinks — NOT the oscillating adversarial dance of vanilla GAN.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 import torch.nn.functional as _F
 
 

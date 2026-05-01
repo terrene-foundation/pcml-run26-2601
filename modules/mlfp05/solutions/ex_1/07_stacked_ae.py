@@ -137,7 +137,7 @@ stacked_losses = train_variant(
 # 5-layer encoder = the DEEPEST dense AE in this exercise. Vanishing
 # gradients are the primary risk at this depth without residuals.
 # This is where the Blood Test earns its keep.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

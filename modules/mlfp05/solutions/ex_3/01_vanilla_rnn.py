@@ -175,18 +175,10 @@ rnn_results = train_model(
 # VanillaRNN is the vanishing-gradient poster child. This diagnostic
 # run is EXPECTED to fire a CRITICAL Blood Test finding — that is
 # the pedagogical point. LSTM (02) and GRU (03) fix it.
-from shared.mlfp05.diagnostics import diagnose_regressor
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (VanillaRNN) ──")
-diag, findings = diagnose_regressor(
-    rnn_model,
-    val_loader,
-    title="Vanilla RNN",
-    n_batches=8,
-    train_losses=rnn_results["train_losses"],
-    val_losses=rnn_results.get("val_losses"),
-    show=False,
-)
+report = diagnose(rnn_model, kind="dl", data=val_loader, show=False)
 
 # ══════ EXPECTED OUTPUT (reference shape — BAD but INSTRUCTIVE) ══════
 # ══════════════════════════════════════════════════════════════════

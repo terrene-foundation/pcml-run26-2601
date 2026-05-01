@@ -397,7 +397,7 @@ print(
 # Contractive VAE = VAE loss + Jacobian penalty. Expect the BLOOD
 # TEST to show low-but-stable gradients — both regularisers pull
 # the encoder toward smoother manifolds.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

@@ -277,9 +277,9 @@ print(f"    Distribution: {dist_wgan}")
 
 # Log to ExperimentTracker
 async def _log_evaluation():
-    async with tracker.run(experiment_name=exp_name, run_name="fid_evaluation") as ctx:
-        await ctx.log_param("n_generated", str(N_FID))
-        await ctx.log_metrics(
+    async with tracker.track(experiment=exp_name, run_name="fid_evaluation") as run:
+        await run.log_param("n_generated", str(N_FID))
+        await run.log_metrics(
             {
                 "fid_vanilla_gan": fid_gan,
                 "fid_wgan_gp": fid_wgan,
@@ -294,7 +294,14 @@ async def _log_evaluation():
 asyncio.run(_log_evaluation())
 
 # ── Checkpoint 3 ─────────────────────────────────────────────────────
-assert fid_gan >= 0 and fid_wgan >= 0, "FID must be non-negative"
+# FID is mathematically non-negative, but numerical FID computed from a
+# small sample (covariance trace + matrix sqrt) can land tiny-negative
+# (~1e-6) due to floating-point in scipy.linalg.sqrtm. Allow a small
+# tolerance — the educational claim ("FID measures distribution distance")
+# is unaffected.
+assert (
+    fid_gan >= -1e-3 and fid_wgan >= -1e-3
+), f"FID expected ~0+; got fid_gan={fid_gan:.6f}, fid_wgan={fid_wgan:.6f}"
 assert 0 <= ent_gan <= np.log2(10) + 0.01, "Entropy out of range"
 assert cov_gan >= 1 and cov_wgan >= 1, "Must produce at least 1 class"
 # INTERPRETATION: FID = 0 means identical distributions. Typical MNIST
@@ -785,6 +792,32 @@ asyncio.run(close_engines(conn))
 
 
 # ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson walked the journey of generative adversarial networks —
+# vanilla GAN, WGAN-GP, FID/coverage/entropy QA pipelines. The kailash-ml
+# SDK ships a single-call diagnostic primitive that closes the production
+# loop: km.diagnose inspects a trained model and emits an auto-dashboard
+# (loss curves, gradient flow, dead neurons, activation stats, weight
+# distributions). One cell. Every diagnostic students would otherwise
+# hand-roll, ready to surface in a Plotly dashboard.
+
+from kailash_ml import diagnose
+
+# Diagnose the WGAN-GP generator (the more stable of the two architectures).
+# Generators take noise vectors as input — we feed a small iterable of
+# `LATENT_DIM`-shaped noise tensors. `kind='auto'` correctly dispatches a
+# torch.nn.Module to DLDiagnostics regardless of input shape.
+noise_iter = [torch.randn(64, LATENT_DIM, device=device) for _ in range(4)]
+report = diagnose(G_wgan, kind="auto", data=noise_iter, show=False)
+report.plot_training_dashboard()
+print()
+print("km.diagnose: 1 line of code -> the same observability the lesson")
+print("body hand-rolled in 200+ lines. This is what 'destination-first'")
+print("means — when the journey is internalised, the SDK is one call.")
+
+
+# ════════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ════════════════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)
@@ -843,9 +876,9 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — five instruments before Visualise
 # ══════════════════════════════════════════════════════════════════
-# Reference: `shared/mlfp05/diagnostics.py` — see gold standard
+# Reference: `kailash_ml.diagnostics` (via `kailash-ml`) — see gold standard
 # `solutions/ex_1/01_standard_ae.py` for the full pattern.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):
@@ -858,6 +891,7 @@ def _diag_loss(m, batch):
         x, y = batch, None
     out = m(x)
     import torch.nn.functional as F
+
     if y is None:
         return F.mse_loss(out, x)
     return F.cross_entropy(out, y)
@@ -908,4 +942,3 @@ except Exception as exc:
 #  [STETHOSCOPE] Diverging G/D losses (D→0, G→∞) is the classic
 #     "Nash equilibrium lost" pattern. WGAN-GP (next exercise) is
 #     the direct fix.
-

@@ -33,7 +33,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from kailash.db import ConnectionManager
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
+from kailash_ml import ExperimentTracker
 
 from shared.mlfp03.ex_8 import (
     OUTPUT_DIR,
@@ -43,7 +43,7 @@ from shared.mlfp03.ex_8 import (
 )
 
 try:
-    from kailash_ml.engines.model_registry import ModelRegistry
+    from kailash_ml import ModelRegistry
 
     HAS_REGISTRY = True
 except ImportError:
@@ -120,7 +120,9 @@ print("\n[ok] Checkpoint 1 — reference model ready for registry\n")
 
 
 async def register_and_promote() -> dict:
-    conn = ConnectionManager("sqlite:///mlfp03_models.db")
+    db = "sqlite:///mlfp03_models.db"
+    tracker = await ExperimentTracker.create(store_url=db)
+    conn = ConnectionManager(db)
     await conn.initialize()
 
     model_version_id = "skipped"
@@ -156,17 +158,14 @@ async def register_and_promote() -> dict:
     else:
         print("\n[warn] ModelRegistry unavailable — skipping register/promote")
 
-    tracker = ExperimentTracker(conn)
-    exp_id = await tracker.create_experiment(
-        name="mlfp03_production_pipeline",
-        description="End-to-end supervised ML pipeline — Module 3 capstone",
-    )
-    async with tracker.run(exp_id, run_name="production_model_v1") as run:
-        await run.log_param("model", "lgbm_calibrated_conformal")
-        await run.log_param("conformal_alpha", str(alpha))
+    exp_id = "mlfp03_production_pipeline"
+    async with tracker.track(experiment=exp_id, run_name="production_model_v1") as run:
+        await run.log_params(
+            {"model": "lgbm_calibrated_conformal", "conformal_alpha": str(alpha)}
+        )
         await run.log_metrics({**metrics, "conformal_coverage": coverage})
-        await run.set_tag("stage", "production")
-        await run.set_tag("market", "singapore")
+        await run.add_tag("stage", "production")
+        await run.add_tag("market", "singapore")
 
     await conn.close()
     return {

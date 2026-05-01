@@ -58,17 +58,17 @@ load_dotenv()
 
 
 async def zero_shot_classify(text: str) -> tuple[str, float, float]:
-    """Classify sentiment with zero examples. Returns (label, cost, elapsed)."""
+    """Classify sentiment with zero examples. Returns (label, tokens, elapsed)."""
     # TODO: Build a prompt that (a) names the task, (b) lists the categories
     # from CATEGORIES, (c) includes the review text, (d) asks for ONLY the
     # category name. Truncate text to 800 chars.
     prompt = ____
 
-    # TODO: Call run_delegate(prompt) and unpack (response, cost, elapsed)
-    response, cost, elapsed = ____
+    # TODO: Call run_delegate(prompt) and unpack (response, tokens, elapsed)
+    response, tokens, elapsed = ____
 
     # TODO: Normalise the free-form response into a discrete label via
-    # normalise_label(). Return (label, cost, elapsed).
+    # normalise_label(). Return (label, tokens, elapsed).
     ____
 
 
@@ -82,7 +82,7 @@ async def evaluate() -> list[dict]:
     results: list[dict] = []
     # TODO: Iterate over zip(docs["text"].to_list(), docs["label"].to_list()),
     # call zero_shot_classify for each, and append a dict with keys:
-    # text, pred, true, correct, cost, elapsed. Print the first 5.
+    # text, pred, true, correct, tokens, elapsed. Print the first 5.
     ____
     return results
 

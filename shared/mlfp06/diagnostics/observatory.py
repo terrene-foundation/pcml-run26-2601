@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """LLM Observatory — central facade composing all six clinical lenses.
 
-Mirrors ``shared.mlfp05.diagnostics.DLDiagnostics`` (the M5 Doctor's Bag)
+Mirrors ``kailash_ml.diagnostics.DLDiagnostics`` (the M5 Doctor's Bag)
 for the M6 problem domain. The facade gives M6 exercises one import and
 one constructor call that wires up every lens:
 
@@ -177,14 +177,29 @@ class LLMObservatory:
 
     # ── Composite report ──────────────────────────────────────────────
 
-    def report(self) -> dict[str, Any]:
+    def report(self, *, format: str = "rich") -> Any:
         """Composite Prescription Pad — one entry per lens.
+
+        Args:
+            format: ``"rich"`` (default) returns a Rich ``Table`` that
+                renders as a colour-coded six-row table when printed in
+                a notebook or terminal. ``"dict"`` returns the
+                programmatic ``{lens: {summary, severity}}`` dict for
+                callers that want to consume the data directly. ``"text"``
+                returns a plain-text rendering for environments without
+                Rich support.
 
         Each lens's ``report()`` returns a plain-text summary. The facade
         wraps each summary into a ``{"summary": str, "severity":
         HEALTHY/WARNING/CRITICAL/UNKNOWN}`` dict so downstream code (e.g.
         a dashboard widget) can colour-code per lens without parsing
         prose.
+
+        The default switched from ``dict`` to ``rich`` in the M6 Ollama
+        migration: students running ``obs.report()`` interactively in a
+        notebook get a readable table instead of a wall of nested-dict
+        text. Programmatic callers should pass ``format="dict"``
+        explicitly.
         """
         result: dict[str, Any] = {}
         for lens_name in (
@@ -219,9 +234,19 @@ class LLMObservatory:
                 "lenses": list(result.keys()),
                 "source": "local_metric",
                 "mode": "real",
+                "format": format,
             },
         )
-        return result
+
+        if format == "dict":
+            return result
+        if format == "text":
+            return _format_report_text(result)
+        if format == "rich":
+            return _format_report_rich(result)
+        raise ValueError(
+            f"unknown report format {format!r} — use 'rich', 'dict', or 'text'"
+        )
 
     # ── Composite dashboard ───────────────────────────────────────────
 
@@ -393,6 +418,67 @@ class LLMObservatory:
 # ════════════════════════════════════════════════════════════════════════
 # Severity derivation — deterministic thresholds over metric summaries
 # ════════════════════════════════════════════════════════════════════════
+
+
+_SEVERITY_STYLE = {
+    _SEVERITY_HEALTHY: "green",
+    _SEVERITY_WARNING: "yellow",
+    _SEVERITY_CRITICAL: "red bold",
+    _SEVERITY_UNKNOWN: "dim",
+}
+
+_LENS_TITLE = {
+    "output": "Output (Stethoscope)",
+    "attention": "Attention (X-Ray)",
+    "retrieval": "Retrieval (Endoscope)",
+    "agent": "Agent (Black Box)",
+    "alignment": "Alignment (ECG)",
+    "governance": "Governance (Flight Recorder)",
+}
+
+
+def _format_report_text(result: dict[str, Any]) -> str:
+    """Render the per-lens report dict as plain text (no Rich dependency)."""
+    lines = ["LLM Observatory Prescription Pad", "=" * 40]
+    for lens_name, payload in result.items():
+        title = _LENS_TITLE.get(lens_name, lens_name)
+        sev = payload.get("severity", _SEVERITY_UNKNOWN)
+        summary = payload.get("summary", "")
+        lines.append(f"  [{sev:<8}] {title}")
+        for line in summary.splitlines() or [""]:
+            lines.append(f"             {line}")
+    return "\n".join(lines)
+
+
+def _format_report_rich(result: dict[str, Any]) -> Any:
+    """Render the per-lens report dict as a Rich ``Table``.
+
+    Falls back to plain text if Rich is not importable so notebook
+    environments without the optional dep still get a readable result.
+    """
+    try:
+        from rich.table import Table
+        from rich.text import Text
+    except ImportError:
+        return _format_report_text(result)
+
+    table = Table(
+        title="LLM Observatory — Prescription Pad",
+        show_header=True,
+        header_style="bold cyan",
+        title_style="bold",
+        expand=False,
+    )
+    table.add_column("Lens", style="bold", no_wrap=True)
+    table.add_column("Severity", justify="center", no_wrap=True)
+    table.add_column("Summary", overflow="fold")
+    for lens_name, payload in result.items():
+        title = _LENS_TITLE.get(lens_name, lens_name)
+        sev = payload.get("severity", _SEVERITY_UNKNOWN)
+        summary = payload.get("summary", "")
+        sev_text = Text(sev, style=_SEVERITY_STYLE.get(sev, ""))
+        table.add_row(title, sev_text, summary)
+    return table
 
 
 def _derive_severity(lens_name: str, summary: str, lens: Any) -> str:

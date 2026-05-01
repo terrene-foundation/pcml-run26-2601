@@ -13,15 +13,19 @@ from __future__ import annotations
 
 import asyncio
 import math
-import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import polars as pl
 
-from kaizen_agents import Delegate
-
 from shared.kailash_helpers import setup_environment
+from shared.mlfp06._ollama_bootstrap import (
+    DEFAULT_CHAT_MODEL,
+    DEFAULT_EMBED_MODEL,
+    make_delegate as _make_chat_delegate,
+    make_embedder,
+    run_delegate_text,
+)
 
 # ════════════════════════════════════════════════════════════════════════
 # ENVIRONMENT SETUP
@@ -29,16 +33,14 @@ from shared.kailash_helpers import setup_environment
 
 setup_environment()
 
-MODEL = os.environ.get("DEFAULT_LLM_MODEL", os.environ.get("OPENAI_PROD_MODEL"))
-if not MODEL:
-    raise EnvironmentError(
-        "Set DEFAULT_LLM_MODEL or OPENAI_PROD_MODEL in .env before running ex_4"
-    )
+MODEL = DEFAULT_CHAT_MODEL
+EMBED_MODEL = DEFAULT_EMBED_MODEL
 
-# Shared dimensionality for the pedagogical embedding helper.  Production RAG
-# uses 768–1536 dim dense vectors; we use a compact 8-dim vector so the LLM
-# can return it reliably and students can eyeball each component.
-EMBED_DIM = 8
+# Real embedding dimensionality — nomic-embed-text returns 768-dim vectors.
+# The previous pedagogical 8-dim "LLM-as-projector" trick was a workaround
+# for the OpenAI-cost-per-call problem; with a free local embedder we use
+# the real thing so retrieval behaves like a production RAG system.
+EMBED_DIM = 768
 
 OUTPUT_DIR = Path("outputs") / "ex4_rag"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -99,46 +101,25 @@ def split_corpus(
 # ════════════════════════════════════════════════════════════════════════
 
 
-def make_delegate(budget_usd: float = 1.0) -> Delegate | None:
-    """Construct a Delegate with a spend ceiling for a single workflow step.
+def make_delegate(budget_usd: float = 1.0) -> object:
+    """Construct an Ollama-backed Kaizen Delegate for RAG generation.
 
-    kaizen_agents 0.9.x renamed `max_llm_cost_usd` to `budget_usd` — same
-    per-run budget cap semantics.
-
-    Offline-graceful: returns ``None`` when no OpenAI key is configured,
-    so downstream helpers can short-circuit to a deterministic stub
-    without crashing the smoke-test path. Real production callers always
-    have a key and never see ``None``.
+    The ``budget_usd`` parameter is retained for API compatibility with
+    older callers and IGNORED — Ollama is free, so cost budgets are
+    meaningless. The Delegate raises :class:`OllamaUnreachableError`
+    transparently if the daemon is not running (no silent fallback).
     """
-    try:
-        return Delegate(model=MODEL, budget_usd=budget_usd)
-    except Exception as exc:
-        print(f"  [offline] make_delegate fallback: {type(exc).__name__}: {exc}")
-        return None
+    del budget_usd  # API compat — see docstring
+    return _make_chat_delegate(model=MODEL)
 
 
-async def delegate_text(delegate: Delegate | None, prompt: str) -> str:
-    """Run a Delegate prompt and collect the streamed text into a single string.
+async def delegate_text(delegate: object, prompt: str) -> str:
+    """Run an Ollama Delegate, return the streamed text.
 
-    Offline-graceful: when ``delegate`` is ``None`` (missing key) or the
-    streamed call fails, returns an empty string so callers see the same
-    "no signal" condition as a degenerate real response.
+    Hard-fails (via the underlying adapter) if the daemon is unreachable.
     """
-    if delegate is None:
-        return ""
-    response = ""
-    try:
-        async for event in delegate.run(prompt):
-            # kaizen_agents 0.9: text lives on TextDelta / TurnComplete events
-            # but not on the DelegateEvent base class. `getattr` stays
-            # type-clean under Pyright and is safe for non-text event types.
-            text_chunk = getattr(event, "text", None)
-            if text_chunk:
-                response += text_chunk
-    except Exception as exc:
-        print(f"  [offline] delegate_text fallback: {type(exc).__name__}: {exc}")
-        return ""
-    return response.strip()
+    text, *_ = await run_delegate_text(delegate, prompt)
+    return text.strip()
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -146,36 +127,34 @@ async def delegate_text(delegate: Delegate | None, prompt: str) -> str:
 # ════════════════════════════════════════════════════════════════════════
 
 
-async def generate_embedding(text: str, delegate: Delegate) -> list[float]:
-    """Generate an 8-dimensional pseudo-embedding via Delegate.
+async def generate_embedding(text: str, delegate: object | None = None) -> list[float]:
+    """Embed a single string with the Ollama embedding model.
 
-    Each component is pinned to a human-readable facet so students can inspect
-    a vector and interpret what each number represents.  Production RAG would
-    call a dedicated embedding model (OpenAI ``text-embedding-3-small``,
-    Cohere, or sentence-transformers) and get 384–1536 dim vectors.
+    Returns a 768-dimensional dense vector from ``nomic-embed-text``
+    (overridable via ``OLLAMA_EMBED_MODEL``). The ``delegate`` argument
+    is retained for API compatibility with the previous OpenAI-era
+    signature and is ignored — embedding goes through a dedicated
+    embedding adapter, not a chat Delegate.
     """
-    prompt = (
-        f"Convert this text into a numeric vector of exactly {EMBED_DIM} "
-        f"numbers between -1 and 1. Each number represents: "
-        f"[topic_relevance, factual_density, specificity, formality, "
-        f"complexity, temporal_recency, sentiment, domain_expertise].\n\n"
-        f'Text: "{text[:300]}"\n\n'
-        f"Return ONLY {EMBED_DIM} comma-separated numbers."
-    )
-    response = await delegate_text(delegate, prompt)
-    try:
-        numbers = [float(x.strip()) for x in response.split(",")[:EMBED_DIM]]
-        while len(numbers) < EMBED_DIM:
-            numbers.append(0.0)
-        return numbers
-    except (ValueError, IndexError):
-        return [0.0] * EMBED_DIM
+    del delegate  # API compat — see docstring
+    embedder = make_embedder(model=EMBED_MODEL)
+    vectors = await embedder.embed([text])
+    return list(vectors[0])
 
 
 async def embed_many(texts: list[str], budget_usd: float = 3.0) -> list[list[float]]:
-    """Embed a batch of texts sequentially through a single Delegate."""
-    delegate = make_delegate(budget_usd=budget_usd)
-    return [await generate_embedding(t, delegate) for t in texts]
+    """Embed a batch of texts via a single Ollama embedding call.
+
+    The embedding adapter batches internally, which is materially faster
+    than the previous one-call-per-text loop (that was a workaround for
+    OpenAI per-call rate limits, not a real constraint with local Ollama).
+    The ``budget_usd`` argument is retained for API compatibility and
+    ignored.
+    """
+    del budget_usd  # API compat — see docstring
+    embedder = make_embedder(model=EMBED_MODEL)
+    vectors = await embedder.embed(texts)
+    return [list(v) for v in vectors]
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -223,7 +202,11 @@ class DenseVectorStore:
 
 
 async def rag_answer(query: str, context: str, budget_usd: float = 0.5) -> str:
-    """Generate an answer grounded in retrieved context."""
+    """Generate an answer grounded in retrieved context.
+
+    The ``budget_usd`` argument is retained for API compatibility and ignored
+    (Ollama is free).
+    """
     delegate = make_delegate(budget_usd=budget_usd)
     prompt = (
         "Answer the question using ONLY the provided context. "
@@ -273,7 +256,7 @@ def plot_score_distribution(
     scores: list[float], title: str, xlabel: str, filename: str
 ) -> None:
     """Histogram of retrieval scores — shows how sharp the ranking is."""
-    fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+    _, ax = plt.subplots(1, 1, figsize=(8, 4))
     ax.hist(scores, bins=20, color="seagreen", edgecolor="white", alpha=0.85)
     ax.set_title(title, fontsize=13, fontweight="bold")
     ax.set_xlabel(xlabel)
@@ -296,7 +279,7 @@ def plot_strategy_comparison(
     strategy_scores: dict[str, list[float]], title: str, filename: str
 ) -> None:
     """Overlayed histograms comparing top-k scores across retrieval strategies."""
-    fig, ax = plt.subplots(1, 1, figsize=(9, 5))
+    _, ax = plt.subplots(1, 1, figsize=(9, 5))
     colors = ["steelblue", "darkorange", "seagreen", "purple", "crimson"]
     for (name, scores), color in zip(strategy_scores.items(), colors):
         ax.hist(scores, bins=15, alpha=0.55, label=name, color=color, edgecolor="white")
@@ -320,7 +303,7 @@ def plot_ragas_metrics(metrics: dict[str, float], title: str, filename: str) -> 
         for v in values
     ]
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+    _, ax = plt.subplots(1, 1, figsize=(8, 4))
     ax.barh(names, values, color=colors, edgecolor="white")
     ax.set_xlim(0, 1)
     ax.set_xlabel("Score (0.0 – 1.0)")

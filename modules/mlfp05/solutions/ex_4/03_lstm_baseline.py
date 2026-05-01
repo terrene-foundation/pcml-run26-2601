@@ -162,18 +162,10 @@ lstm_losses, lstm_accs = train_model(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — LSTM baseline (contrast with Transformer 02)
 # ══════════════════════════════════════════════════════════════════
-from shared.mlfp05.diagnostics import diagnose_classifier
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (LSTM baseline) ──")
-diag, findings = diagnose_classifier(
-    lstm_model,
-    val_loader,
-    title="LSTM baseline (AG News)",
-    n_batches=8,
-    train_losses=lstm_losses,
-    val_losses=[1.0 - a for a in lstm_accs],
-    show=False,
-)
+report = diagnose(lstm_model, kind="dl", data=val_loader, show=False)
 # ══════ EXPECTED OUTPUT (reference pattern — LSTM on AG News) ═══════
 # ════════════════════════════════════════════════════════════════
 #   DL Diagnostics Report — Prescription Pad

@@ -32,7 +32,7 @@ import asyncio
 import numpy as np
 import plotly.graph_objects as go
 from kailash.db import ConnectionManager
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
+from kailash_ml import ExperimentTracker
 from scipy import stats
 
 from shared.mlfp02.ex_7 import (
@@ -249,18 +249,14 @@ print(f"Annualised net value: S${(daily_gain - daily_loss) * 365:,.0f}")
 
 
 async def log_bayesian_results():
-    conn = ConnectionManager("sqlite:///mlfp02_experiments.db")
+    db = "sqlite:///mlfp02_experiments.db"
+    tracker = await ExperimentTracker.create(store_url=db)
+    conn = ConnectionManager(db)
     await conn.initialize()
-    tracker = ExperimentTracker(conn)
-    await tracker.initialize()
 
-    exp_id = await tracker.create_experiment(
-        name="mlfp02_ex7_bayesian_ab",
-        description="Bayesian A/B testing with expected loss",
-        tags=["mlfp02", "bayesian", "expected-loss"],
-    )
+    exp_id = "mlfp02_ex7_bayesian_ab"
 
-    async with tracker.run(exp_id, run_name="bayesian_decision") as run:
+    async with tracker.track(experiment=exp_id, run_name="bayesian_decision") as run:
         await run.log_params(
             {
                 "method": "bayesian_normal_approx",

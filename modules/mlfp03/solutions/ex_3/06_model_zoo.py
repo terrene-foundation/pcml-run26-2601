@@ -238,6 +238,36 @@ print(
 
 
 # ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson built five classical models from primitives — fitting each,
+# timing each, building a comparison table, mapping decision boundaries.
+# The kailash-ml SDK packages the entire diagnostic surface (per-class
+# metrics, class-balance severity, confusion matrix, accuracy heuristics)
+# into a single call.
+#
+# Destination-first: when the journey is internalised, the SDK is one line.
+
+from kailash_ml import diagnose
+
+# `kind="classical_classifier"` dispatches to the sklearn ClassifierMixin
+# adapter; `data=(X, y)` is the validation pair the lesson already built.
+# Use the F1 winner from the comparison above.
+best_model = zoo[best_f1["name"]]
+report = diagnose(
+    best_model, kind="classical_classifier", data=(X_test, y_test), show=False
+)
+print()
+print(f"  km.diagnose model    : {best_f1['name']}")
+print(f"  km.diagnose metrics  : {report.metrics}")
+print(f"  km.diagnose severity : {report.severity}")
+print()
+print("km.diagnose: 1 call -> the same diagnostic surface the lesson body")
+print("hand-rolled across all 5 models. Destination-first: when the")
+print("journey is internalised, the SDK is one line.")
+
+
+# ════════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ════════════════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)

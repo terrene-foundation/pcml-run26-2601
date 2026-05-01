@@ -629,18 +629,10 @@ print(
 # pixels drove the prediction?" and surfaces spurious shortcuts
 # (Zech et al. 2018: hospitals' chest-X-ray models latched onto
 # watermarks instead of pathology).
-from shared.mlfp05.diagnostics import diagnose_classifier
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (SimpleCNN) ──")
-diag, findings = diagnose_classifier(
-    simple_cnn,
-    val_loader,
-    title="SimpleCNN (CIFAR-10)",
-    n_batches=8,
-    train_losses=simple_losses,
-    val_losses=[1.0 - a for a in simple_accs],  # proxy val curve
-    show=False,
-)
+report = diagnose(simple_cnn, kind="dl", data=val_loader)
 
 # Grad-CAM on the last conv layer: verify the model looks at objects,
 # not backgrounds. Pick a validation batch and a target class.

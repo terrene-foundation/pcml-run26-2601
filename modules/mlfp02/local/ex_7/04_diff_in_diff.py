@@ -38,7 +38,7 @@ import asyncio
 import numpy as np
 import plotly.graph_objects as go
 from kailash.db import ConnectionManager
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
+from kailash_ml import ExperimentTracker
 
 from shared.mlfp02.ex_7 import (
     OUTPUT_DIR,
@@ -303,18 +303,14 @@ When to use each method:
 
 
 async def log_did_results():
-    conn = ConnectionManager("sqlite:///mlfp02_experiments.db")
+    db = "sqlite:///mlfp02_experiments.db"
+    tracker = await ExperimentTracker.create(store_url=db)
+    conn = ConnectionManager(db)
     await conn.initialize()
-    tracker = ExperimentTracker(conn)
-    await tracker.initialize()
 
-    exp_id = await tracker.create_experiment(
-        name="mlfp02_ex7_diff_in_diff",
-        description="DiD analysis of Singapore HDB cooling measures",
-        tags=["mlfp02", "did", "causal-inference", "singapore"],
-    )
+    exp_id = "mlfp02_ex7_diff_in_diff"
 
-    async with tracker.run(exp_id, run_name="did_hdb_cooling") as run:
+    async with tracker.track(experiment=exp_id, run_name="did_hdb_cooling") as run:
         await run.log_params(
             {
                 "did_treatment": "Central Singapore HDB",

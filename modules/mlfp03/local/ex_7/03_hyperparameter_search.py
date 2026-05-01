@@ -33,17 +33,13 @@ import lightgbm as lgb
 import numpy as np
 from sklearn.model_selection import cross_val_score
 
+from kailash_ml import HyperparameterSearch, TrainingPipeline
 from kailash_ml.engines.hyperparameter_search import (
-    HyperparameterSearch,
     ParamDistribution,
     SearchConfig,
     SearchSpace,
 )
-from kailash_ml.engines.training_pipeline import (
-    EvalSpec,
-    ModelSpec,
-    TrainingPipeline,
-)
+from kailash_ml.engines.training_pipeline import EvalSpec, ModelSpec
 from kailash_ml.interop import to_sklearn_input
 
 from shared.mlfp03.ex_7 import (

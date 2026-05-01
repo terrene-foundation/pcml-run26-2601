@@ -88,18 +88,18 @@ base_model = ____
 config = ____
 
 print(f"  Method:        {config.method}")
-print(f"  Base model:    {config.base_model}")
-print(f"  LoRA:          r={config.lora_r}, alpha={config.lora_alpha}")
-print(f"  Target modules: {config.target_modules}")
-print(f"  Epochs:        {config.num_epochs}")
-print(f"  Batch size:    {config.batch_size}")
-print(f"  Learning rate: {config.learning_rate}")
-print(f"  Output dir:    {config.output_dir}")
+print(f"  Base model:    {config.base_model_id}")
+print(f"  LoRA:          r={config.lora.rank}, alpha={config.lora.alpha}")
+print(f"  Target modules: {config.lora.target_modules}")
+print(f"  Epochs:        {config.sft.num_train_epochs}")
+print(f"  Batch size:    {config.sft.per_device_train_batch_size}")
+print(f"  Learning rate: {config.sft.learning_rate}")
+print(f"  Output dir:    {config.experiment_dir}")
 
 # ── Checkpoint 2 ─────────────────────────────────────────────────────────
 assert config.method == "sft", "Task 2: method should be 'sft'"
-assert config.lora_r == 16, "Task 2: LoRA rank should be 16"
-assert "q_proj" in config.target_modules, "Task 2: q_proj must be a target module"
+assert config.lora.rank == 16, "Task 2: LoRA rank should be 16"
+assert "q_proj" in config.lora.target_modules, "Task 2: q_proj must be a target module"
 print("✓ Checkpoint 2 passed — AlignmentConfig built\n")
 
 
@@ -129,7 +129,11 @@ async def run_sft_and_register() -> dict:
             "adapter_path": str(OUTPUT_DIR / "sft_output" / "adapter"),
         }
     else:
-        from kailash_align import AdapterRegistry, AlignmentPipeline
+        from kailash_align import (
+            AdapterRegistry,
+            AdapterSignature,
+            AlignmentPipeline,
+        )
 
         # TODO: Instantiate AlignmentPipeline(config) and await
         # pipeline.train(train_data=..., eval_data=...)
@@ -147,12 +151,21 @@ async def run_sft_and_register() -> dict:
         print(f"  Eval loss:     {metrics['eval_loss']:.4f}")
         print(f"  Training time: {metrics['training_time_seconds']:.0f}s")
 
-        # TODO: registry = AdapterRegistry(); await registry.register(
-        #     name="imdb_sentiment_sft_v1", base_model=config.base_model,
-        #     method="sft_lora", adapter_path=metrics["adapter_path"],
-        #     metrics={"final_loss": ..., "eval_loss": ...},
-        #     tags=["imdb", "sentiment", "lora-r16"])
+        # TODO: Instantiate registry = AdapterRegistry()
         registry = ____
+        # TODO: Build an AdapterSignature with base_model_id=config.base_model_id,
+        #   adapter_type="lora", training_method="sft"
+        signature = ____
+        # TODO: await registry.register_adapter(
+        #     name="imdb_sentiment_sft_v1",
+        #     adapter_path=metrics["adapter_path"],
+        #     signature=signature,
+        #     training_metrics={"final_loss": ..., "eval_loss": ...},
+        #     tags=["imdb", "sentiment", "lora-r16"])
+        # register_adapter returns an AdapterVersion (not a string).
+        version = ____
+        # TODO: Build a stable adapter_id string of the form
+        #   f"{version.adapter_name}:v{version.version}"
         adapter_id = ____
         metrics["adapter_id"] = adapter_id
         print(f"  Registered as: {adapter_id}")

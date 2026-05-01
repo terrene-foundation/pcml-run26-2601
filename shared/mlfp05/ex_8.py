@@ -22,12 +22,9 @@ import torch.nn as nn
 import gymnasium as gym
 from gymnasium import spaces
 
-import polars as pl
-
 from kailash.db import ConnectionManager
-from kailash_ml import ModelVisualizer
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
-from kailash_ml.engines.model_registry import ModelRegistry
+from kailash_ml import ExperimentTracker, ModelVisualizer
+from kailash_ml import ModelRegistry
 
 from shared.kailash_helpers import get_device, setup_environment
 
@@ -53,8 +50,16 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 def make_cartpole() -> tuple[gym.Env, int, int]:
     """Create CartPole-v1 and return (env, obs_dim, n_actions)."""
     env = gym.make("CartPole-v1")
-    obs_dim = env.observation_space.shape[0]
-    n_actions = env.action_space.n
+    obs_space = env.observation_space
+    act_space = env.action_space
+    assert (
+        isinstance(obs_space, spaces.Box) and obs_space.shape is not None
+    ), f"CartPole obs space expected gymnasium Box, got {type(obs_space).__name__}"
+    assert isinstance(
+        act_space, spaces.Discrete
+    ), f"CartPole action space expected Discrete, got {type(act_space).__name__}"
+    obs_dim = obs_space.shape[0]
+    n_actions = int(act_space.n)
     print(f"CartPole-v1  obs_dim={obs_dim}  n_actions={n_actions}")
     return env, obs_dim, n_actions
 
@@ -65,24 +70,17 @@ def make_cartpole() -> tuple[gym.Env, int, int]:
 
 
 async def _setup_engines():
-    conn = ConnectionManager("sqlite:///mlfp05_rl.db")
+    """Open kailash-ml 1.1.1 tracker + registry. 5-tuple preserved."""
+    # Schema-conflict workaround (kailash-ml 1.5.x): ExperimentTracker
+    # and ModelRegistry use incompatible _kml_model_versions schemas.
+    # Route them to separate sqlite files until upstream fixes the conflict.
+    db = "sqlite:///mlfp05_rl.db"
+    registry_db = "sqlite:///mlfp05_rl_registry.db"
+    tracker = await ExperimentTracker.create(store_url=db)
+    conn = ConnectionManager(registry_db)
     await conn.initialize()
-
-    tracker = ExperimentTracker(conn)
-    exp_name = await tracker.create_experiment(
-        name="m5_reinforcement_learning",
-        description="RL algorithms: DQN and PPO on CartPole and business envs",
-    )
-
-    try:
-        registry = ModelRegistry(conn)
-        has_registry = True
-    except Exception as e:
-        registry = None
-        has_registry = False
-        print(f"  Note: ModelRegistry setup skipped ({e})")
-
-    return conn, tracker, exp_name, registry, has_registry
+    registry = ModelRegistry(conn)
+    return conn, tracker, "m5_reinforcement_learning", registry, True
 
 
 def setup_engines() -> tuple:
@@ -156,7 +154,7 @@ def evaluate_policy(env: gym.Env, policy_fn, n_episodes: int = 30) -> list[float
         while not done:
             action = policy_fn(state)
             state, reward, terminated, truncated, _ = env.step(action)
-            total += reward
+            total += float(reward)
             done = terminated or truncated
         eval_returns.append(total)
     return eval_returns

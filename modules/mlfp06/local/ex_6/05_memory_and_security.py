@@ -20,7 +20,7 @@ import asyncio
 import time
 
 import polars as pl
-from kaizen_agents import Delegate
+from shared.mlfp06._ollama_bootstrap import make_delegate, run_delegate_text
 
 from shared.mlfp06.ex_6 import (
     MODEL,
@@ -160,22 +160,17 @@ print("\n✓ Checkpoint 3 passed\n")
 
 async def single_agent_analysis(doc: str, question: str) -> dict:
     """Run a single Delegate on the task."""
-    # Delegate's budget kwarg in kaizen_agents 0.9.x is `budget_usd`
-    # (the legacy `max_llm_cost_usd` was removed with BaseAgentConfig).
-    delegate = Delegate(model=MODEL, budget_usd=3.0)
+    # M6 Ollama migration: route through the bootstrap factory so the local
+    # Ollama daemon backs the call (no API keys, no silent OpenAI fallback).
+    delegate = make_delegate(model=MODEL)
     t0 = time.perf_counter()
     prompt = (
         "Analyse this passage and answer the question.\n\n"
         f"Passage: {doc[:2000]}\nQuestion: {question}\n\nAnswer:"
     )
-    response = ""
-    # TODO: Stream events from delegate.run(prompt) — it's an async generator;
-    # concatenate event.text to response for events that have a .text attribute.
-    # Hint:
-    #   async for event in delegate.run(prompt):
-    #       if hasattr(event, "text"):
-    #           response += event.text
-    ____
+    # TODO: collect the streamed text from the Ollama Delegate.
+    # Hint: `text, *_ = await run_delegate_text(delegate, prompt)`
+    response = ____
     return {
         "answer": response.strip(),
         "latency_s": time.perf_counter() - t0,

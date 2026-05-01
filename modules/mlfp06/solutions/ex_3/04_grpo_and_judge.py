@@ -35,7 +35,8 @@ import json
 
 import polars as pl
 import torch
-from kaizen_agents import Delegate
+
+# Delegate construction routes through shared.mlfp06._ollama_bootstrap.
 
 from shared.mlfp06.ex_3 import (
     MODEL_NAME,
@@ -116,8 +117,13 @@ print("=" * 70)
 
 async def llm_judge(prompt: str, response_a: str, response_b: str) -> dict:
     """Ask an LLM to pick between two responses. Returns parsed JSON verdict."""
-    # kaizen_agents 0.9.x: max_llm_cost_usd -> budget_usd (same semantics)
-    delegate = Delegate(model=MODEL_NAME, budget_usd=0.5)
+    # M6 Ollama migration: route every Delegate through the bootstrap so the
+    # local Ollama daemon backs the call (no API keys, no silent OpenAI fall-
+    # back). The bootstrap raises OllamaUnreachableError if the daemon is
+    # down — caller sees the real failure, not a fake "tie" verdict.
+    from shared.mlfp06._ollama_bootstrap import make_delegate, run_delegate_text
+
+    delegate = make_delegate(model=MODEL_NAME)
     judge_prompt = f"""You are an impartial judge evaluating two responses to a user query.
 
 Query: {prompt[:500]}
@@ -132,14 +138,7 @@ Evaluate on: helpfulness, accuracy, clarity, safety.
 Output ONLY a JSON object:
 {{"winner": "A" or "B" or "tie", "score_a": 1-10, "score_b": 1-10, "reasoning": "..."}}"""
 
-    response = ""
-    async for event in delegate.run(judge_prompt):
-        # kaizen_agents 0.9: text lives on TextDelta / TurnComplete
-        # subclasses, not on the DelegateEvent base class. `getattr` is
-        # type-clean under Pyright and safe on non-text event types.
-        text_chunk = getattr(event, "text", None)
-        if text_chunk:
-            response += text_chunk
+    response, *_ = await run_delegate_text(delegate, judge_prompt)
 
     try:
         start = response.index("{")

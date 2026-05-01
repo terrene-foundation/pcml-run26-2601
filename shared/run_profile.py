@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from kailash_ml import DataExplorer
-from kailash_ml.engines.data_explorer import AlertConfig
+from kailash_ml import AlertConfig
 
 if TYPE_CHECKING:
-    from kailash_ml.engines.data_explorer import ComparisonResult, DataProfile
+    from kailash_ml import ComparisonResult, DataProfile
 
 
 def run_profile(df: pl.DataFrame, name: str = "profile") -> DataProfile:

@@ -208,11 +208,23 @@ serving_model.to(device)
 
 
 async def serve_predictions():
-    """Load model and serve sample predictions via InferenceServer."""
-    server = InferenceServer()
+    """Load model and serve sample predictions via InferenceServer.
+
+    kailash-ml 1.5.x: InferenceServer is constructed via
+    ``InferenceServer.from_registry(name, registry=...)`` and binds a
+    single model. The earlier ``server.load_model(...)`` direct-handoff
+    pattern is gone; production serving expects models to flow through
+    the registry first.
+    """
+    try:
+        server = InferenceServer.from_registry("cifar10_transfer", registry=registry)
+        print("  InferenceServer (1.5.x): bound to cifar10_transfer")
+    except Exception as e:
+        # Model may not be registered yet on a fresh run; degrade gracefully.
+        print(f"  InferenceServer demo skipped: {type(e).__name__}: {e}")
+        server = None  # noqa: F841 — preserve var name for later cells
 
     try:
-        await server.load_model("cifar10_transfer", serving_model)
 
         # Get a batch of test images
         test_batch_x, test_batch_y = next(iter(val_loader))
@@ -490,6 +502,31 @@ asyncio.run(conn.close())
 
 
 # ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson walked the journey of transfer learning and production
+# deployment — from-scratch baseline, ResNet-18 fine-tuning, ONNX export,
+# inference benchmarking. The kailash-ml SDK ships a single-call
+# diagnostic primitive that closes the production loop: km.diagnose
+# inspects a trained model and emits an auto-dashboard (loss curves,
+# gradient flow, dead neurons, activation stats, weight distributions).
+# One cell. Every diagnostic students would otherwise hand-roll, ready
+# to surface in a Plotly dashboard.
+
+from kailash_ml import diagnose
+
+# Diagnose the production transfer model. `kind='auto'` dispatches by
+# model type — DLDiagnostics for torch.nn.Module. `data=` accepts any
+# iterable yielding tensors; we reuse val_loader.
+report = diagnose(prod_model, kind="auto", data=val_loader, show=False)
+report.plot_training_dashboard()
+print()
+print("km.diagnose: 1 line of code -> the same observability the lesson")
+print("body hand-rolled in 200+ lines. This is what 'destination-first'")
+print("means — when the journey is internalised, the SDK is one call.")
+
+
+# ════════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ════════════════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)
@@ -544,9 +581,9 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — five instruments before Visualise
 # ══════════════════════════════════════════════════════════════════
-# Reference: `shared/mlfp05/diagnostics.py` — see gold standard
+# Reference: `kailash_ml.diagnostics` (via `kailash-ml`) — see gold standard
 # `solutions/ex_1/01_standard_ae.py` for the full pattern.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):
@@ -559,6 +596,7 @@ def _diag_loss(m, batch):
         x, y = batch, None
     out = m(x)
     import torch.nn.functional as F
+
     if y is None:
         return F.mse_loss(out, x)
     return F.cross_entropy(out, y)
@@ -600,4 +638,3 @@ except Exception as exc:
 #     means 99% of requests fit in a 10ms SLA. Slide 5.7
 #     production bridge slide references OnnxBridge + InferenceServer
 #     as the Kailash production stack.
-

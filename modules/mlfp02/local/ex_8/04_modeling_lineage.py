@@ -186,12 +186,10 @@ if has_backend:
     try:
 
         async def log_lineage():
-            exp_id = await tracker.create_experiment(
-                name="mlfp02_capstone_model",
-                description="Capstone: HDB price model with v2 features",
-                tags=["mlfp02", "capstone", "feature-store", "lineage"],
-            )
-            async with tracker.run(exp_id, run_name="hdb_price_ols_v2") as run:
+            exp_id = "mlfp02_capstone_model"
+            async with tracker.track(
+                experiment=exp_id, run_name="hdb_price_ols_v2"
+            ) as run:
                 await run.log_params(
                     {
                         "feature_schema": "hdb_property_features",
@@ -209,7 +207,7 @@ if has_backend:
                         "f_statistic": float(ols["f_stat"]),
                     }
                 )
-                run_id = run.id if hasattr(run, "id") else "logged"
+                run_id = run.run_id
             return exp_id, run_id
 
         exp_id, run_id = asyncio.run(log_lineage())

@@ -228,7 +228,7 @@ class TransformerClassifier(nn.Module):
         # Hint: self.emb_drop = nn.Dropout(dropout)
         # Hint: layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads,
         #              dim_feedforward=4 * d_model, dropout=dropout, batch_first=True)
-        # Hint: self.encoder = nn.TransformerEncoder(layer, num_layers=n_layers)
+        # Hint: self.encoder = nn.TransformerEncoder(layer, num_layers=n_layers, enable_nested_tensor=False)  # MPS-compat
         # Hint: self.head_drop = nn.Dropout(dropout)
         # Hint: self.head = nn.Linear(d_model, n_classes)
         self.embed = ...  # YOUR CODE HERE
@@ -464,16 +464,13 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — Transformer (attention + residual stack)
 # ══════════════════════════════════════════════════════════════════
-from shared.mlfp05.diagnostics import diagnose_classifier
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (Transformer Encoder) ──")
-diag, findings = diagnose_classifier(
+report = diagnose(
     transformer_model,
-    val_loader,
-    title="Transformer Encoder (AG News)",
-    n_batches=8,
-    train_losses=transformer_losses,
-    val_losses=[1.0 - a for a in transformer_accs],
+    kind="dl",
+    data=val_loader,
     show=False,
 )
 

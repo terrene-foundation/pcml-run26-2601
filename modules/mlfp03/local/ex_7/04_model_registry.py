@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import asyncio
 
-from kailash_ml.engines.training_pipeline import (
+from kailash_ml import (
     EvalSpec,
     ModelSpec,
     TrainingPipeline,

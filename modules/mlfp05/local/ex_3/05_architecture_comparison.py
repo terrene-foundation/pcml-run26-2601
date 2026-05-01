@@ -21,11 +21,8 @@
 # ════════════════════════════════════════════════════════════════════════
 """
 from __future__ import annotations
-
 import time
-
 import matplotlib
-
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,7 +31,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
-
 from shared.mlfp05.ex_3 import (
     BATCH_SIZE,
     CLIP,
@@ -55,7 +51,6 @@ from shared.mlfp05.ex_3 import (
     register_best_model,
     get_visualizer,
 )
-
 # ════════════════════════════════════════════════════════════════════════
 # THEORY — Choosing the Right Sequence Architecture
 # ════════════════════════════════════════════════════════════════════════
@@ -86,15 +81,11 @@ from shared.mlfp05.ex_3 import (
 # For sequences longer than ~200 steps, Transformers (Exercise 4)
 # replace all of the above with parallel self-attention.
 # ════════════════════════════════════════════════════════════════════════
-
 device = init_environment()
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 1 — Load data and set up experiment tracking
 # ════════════════════════════════════════════════════════════════════════
 stock_data, PRIMARY, primary_df = load_stock_data()
-
 (
     train_loader,
     val_loader,
@@ -107,17 +98,13 @@ stock_data, PRIMARY, primary_df = load_stock_data()
     n_train_w,
     N_FEATURES,
 ) = prepare_dataloaders(primary_df, device)
-
 conn, tracker, exp_name, registry, has_registry = setup_engines(
     PRIMARY, experiment_suffix="comparison"
 )
-
 # ── Checkpoint 1 ─────────────────────────────────────────────────────
 assert X_train_t.shape[1] == SEQ_LEN
 assert tracker is not None
 print("--- Checkpoint 1 passed --- data and tracking ready\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 2 — Define all four architectures
 # ════════════════════════════════════════════════════════════════════════
@@ -128,12 +115,9 @@ class VanillaRNN(nn.Module):
         super().__init__()
         # TODO: Define nn.RNN layer (input_dim, hidden_dim, batch_first=True, nonlinearity="tanh")
         # TODO: Define nn.Linear prediction head (hidden_dim, horizon)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # TODO: out, _ = self.rnn(x); return self.head(out[:, -1])
         pass
-
-
 class LSTMRegressor(nn.Module):
     def __init__(
         self, input_dim: int, hidden_dim: int, horizon: int = FORECAST_HORIZON
@@ -141,12 +125,9 @@ class LSTMRegressor(nn.Module):
         super().__init__()
         # TODO: Define nn.LSTM layer (input_dim, hidden_dim, batch_first=True)
         # TODO: Define nn.Linear prediction head (hidden_dim, horizon)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # TODO: out, _ = self.lstm(x); return self.head(out[:, -1])
         pass
-
-
 class GRURegressor(nn.Module):
     def __init__(
         self, input_dim: int, hidden_dim: int, horizon: int = FORECAST_HORIZON
@@ -154,18 +135,14 @@ class GRURegressor(nn.Module):
         super().__init__()
         # TODO: Define nn.GRU layer (input_dim, hidden_dim, batch_first=True)
         # TODO: Define nn.Linear prediction head (hidden_dim, horizon)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # TODO: out, _ = self.gru(x); return self.head(out[:, -1])
         pass
-
-
 class TemporalAttention(nn.Module):
     def __init__(self, hidden_dim: int):
         super().__init__()
         # TODO: Define W — nn.Linear(hidden_dim, hidden_dim)
         # TODO: Define v — nn.Linear(hidden_dim, 1, bias=False)
-
     def forward(self, lstm_outputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # TODO: energy = tanh(self.W(lstm_outputs))
         # TODO: scores = self.v(energy).squeeze(-1)
@@ -173,21 +150,16 @@ class TemporalAttention(nn.Module):
         # TODO: context = bmm(weights.unsqueeze(1), lstm_outputs).squeeze(1)
         # TODO: return context, weights
         pass
-
-
 class LSTMWithAttention(nn.Module):
     def __init__(
         self, input_dim: int, hidden_dim: int, horizon: int = FORECAST_HORIZON
     ):
         super().__init__()
         # TODO: Define nn.LSTM, TemporalAttention, nn.Linear head
-
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # TODO: lstm_out -> attention -> head
         # TODO: Return pred, attn_weights
         pass
-
-
 # Instantiate all four
 models = {
     "VanillaRNN": VanillaRNN(input_dim=N_FEATURES, hidden_dim=HIDDEN_DIM),
@@ -196,19 +168,15 @@ models = {
     "LSTM+Attention": LSTMWithAttention(input_dim=N_FEATURES, hidden_dim=HIDDEN_DIM),
 }
 is_attn = {"VanillaRNN": False, "LSTM": False, "GRU": False, "LSTM+Attention": True}
-
 param_counts = {}
 for name, model in models.items():
     n_params = sum(p.numel() for p in model.parameters())
     param_counts[name] = n_params
     print(f"  {name}: {n_params:,} parameters")
-
 # ── Checkpoint 2 ─────────────────────────────────────────────────────
 assert len(models) == 4
 assert param_counts["GRU"] < param_counts["LSTM"]
 print("--- Checkpoint 2 passed --- all four architectures defined\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 3 — Train all four architectures under identical conditions
 # ════════════════════════════════════════════════════════════════════════
@@ -227,14 +195,11 @@ for name, model in models.items():
         attn=is_attn[name],
     )
     all_results[name] = results
-
 # ── Checkpoint 3 ─────────────────────────────────────────────────────
 for name, res in all_results.items():
     assert len(res["train_losses"]) == EPOCHS, f"{name} should have {EPOCHS} epochs"
     assert res["final_val_loss"] < 5.0, f"{name} val loss suspiciously high"
 print("\n--- Checkpoint 3 passed --- all four architectures trained\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 4 — Comprehensive comparison table
 # ════════════════════════════════════════════════════════════════════════
@@ -248,20 +213,15 @@ for name, res in all_results.items():
         f"{np.mean(res['gradient_norms']):>10.4f}"
     )
 print("=" * 80)
-
 best_name = min(all_results, key=lambda k: all_results[k]["final_val_loss"])
 best_val = all_results[best_name]["final_val_loss"]
 print(f"\n  Best model: {best_name} (val_loss={best_val:.4f})")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 5 — Inference latency benchmark
 # ════════════════════════════════════════════════════════════════════════
 def _predict_for_bench(model, x, attn=False):
     out = model(x)
     return out[0] if attn else out
-
-
 def benchmark_inference(
     model: nn.Module, name: str, attn: bool, n_runs: int = 200
 ) -> float:
@@ -280,25 +240,19 @@ def benchmark_inference(
         torch.cuda.synchronize()
     elapsed_ms = (time.perf_counter() - start) / n_runs * 1000
     return elapsed_ms
-
-
 print("\n== Inference Latency ==")
 latencies = {}
 for name, model in models.items():
     lat = benchmark_inference(model, name, is_attn[name])
     latencies[name] = lat
     print(f"  {name}: {lat:.3f} ms/inference")
-
 fastest = min(latencies, key=latencies.get)
 print(f"  Fastest: {fastest} ({latencies[fastest]:.3f} ms)")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 6 — Multi-stock generalisation test
 # ════════════════════════════════════════════════════════════════════════
 print(f"\n== Multi-Stock Generalisation ({best_name}) ==")
 multi_stock_results: dict[str, float] = {PRIMARY: best_val}
-
 # TODO: For each stock in stock_data (except PRIMARY):
 #   - Build dataset using build_dataset()
 #   - Create train/val DataLoaders
@@ -311,20 +265,15 @@ for symbol, sdf in stock_data.items():
         continue
     # TODO: Build dataset, train best model, evaluate, store result
     pass
-
 avg_cross_stock = np.mean(list(multi_stock_results.values()))
 print(f"\n  Average cross-stock val loss: {avg_cross_stock:.4f}")
-
 # ── Checkpoint 4 ─────────────────────────────────────────────────────
 assert len(multi_stock_results) >= 2, "Need multi-stock results"
 print("--- Checkpoint 4 passed --- multi-stock generalisation complete\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 7 — Comprehensive comparison dashboard
 # ════════════════════════════════════════════════════════════════════════
 viz = get_visualizer()
-
 # 7A: Training curves (all models overlaid)
 train_metrics = {}
 for label, res in all_results.items():
@@ -333,13 +282,11 @@ for label, res in all_results.items():
 viz.training_history(
     metrics=train_metrics, x_label="Epoch", y_label="MSE Loss"
 ).write_html(str(OUTPUT_DIR / "05_comparison_training_curves.html"))
-
 # 7B: Gradient norms (all models overlaid)
 grad_metrics = {k: v["gradient_norms"] for k, v in all_results.items()}
 viz.training_history(
     metrics=grad_metrics, x_label="Epoch", y_label="Gradient L2 Norm"
 ).write_html(str(OUTPUT_DIR / "05_comparison_gradient_norms.html"))
-
 # 7C: Prediction vs actual for best model
 best_model = models[best_name]
 best_model.eval()
@@ -349,18 +296,15 @@ with torch.no_grad():
     else:
         val_preds = best_model(X_val_t)
         val_attn_weights = None
-
 close_mean, close_std = norm_mean[0, 0], norm_std[0, 0]
 preds_denorm = val_preds.cpu().numpy() * close_std + close_mean
 actual_denorm = y_val_t.cpu().numpy() * close_std + close_mean
-
 pred_df = pl.DataFrame(
     {"actual": actual_denorm[:, 0].tolist(), "predicted": preds_denorm[:, 0].tolist()}
 )
 viz.scatter(pred_df, x="actual", y="predicted").write_html(
     str(OUTPUT_DIR / "05_comparison_pred_vs_actual.html")
 )
-
 # 7D: Comprehensive comparison figure (matplotlib)
 # TODO: Create 2x3 subplot figure (20, 12) with these panels:
 #   (0,0): Val loss over epochs — all 4 models overlaid with legend
@@ -388,14 +332,12 @@ fig.tight_layout()
 fig.savefig(str(OUTPUT_DIR / "05_comparison_dashboard.png"), dpi=150)
 plt.close(fig)
 print("  Saved: 05_comparison_dashboard.png")
-
 # 7E: Horizon error by day for all models
 print("\n== Forecast Error by Horizon Day (all models) ==")
 print(f"  {'Day':<6s}", end="")
 for name in model_names:
     print(f"  {name:>16s}", end="")
 print()
-
 all_horizon_rmses = {}
 for name in model_names:
     model = models[name]
@@ -411,20 +353,16 @@ for name in model_names:
         rmse = float(np.mean((vp_denorm[:, day] - actual_denorm[:, day]) ** 2)) ** 0.5
         rmses.append(rmse)
     all_horizon_rmses[name] = rmses
-
 for day in range(FORECAST_HORIZON):
     print(f"  Day {day+1:<3d}", end="")
     for name in model_names:
         print(f"  {all_horizon_rmses[name][day]:>16.2f}", end="")
     print()
-
 # ── Checkpoint 5 ─────────────────────────────────────────────────────
 assert (OUTPUT_DIR / "05_comparison_dashboard.png").exists()
 assert (OUTPUT_DIR / "05_comparison_training_curves.html").exists()
 assert (OUTPUT_DIR / "05_comparison_pred_vs_actual.html").exists()
 print("\n--- Checkpoint 5 passed --- comparison dashboard generated\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 8 — Register overall best model
 # ════════════════════════════════════════════════════════════════════════
@@ -436,12 +374,9 @@ register_best_model(
     registry,
     has_registry,
 )
-
 # ── Checkpoint 6 ─────────────────────────────────────────────────────
 assert best_val < 5.0, "Best model val loss should be reasonable"
 print("--- Checkpoint 6 passed --- best model registered\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 9 — Architecture selection guide (decision framework)
 # ════════════════════════════════════════════════════════════════════════
@@ -451,24 +386,19 @@ print("=" * 80)
 print(
     f"""
   Based on the experiments above, here is a decision framework:
-
   QUESTION 1: How long are your sequences?
     < 10 steps  -> VanillaRNN (simplest, fastest, adequate)
     10-200 steps -> LSTM or GRU (gates preserve long-range dependencies)
     > 200 steps  -> Transformer (Exercise 4 — parallel self-attention)
-
   QUESTION 2: Does latency matter?
     Yes (real-time, sensor, trading) -> GRU ({latencies['GRU']:.3f}ms vs LSTM {latencies['LSTM']:.3f}ms)
     No (batch, offline, training)    -> LSTM or LSTM+Attention
-
   QUESTION 3: Do you need explainability?
     Yes (healthcare, finance, regulated) -> LSTM+Attention (attention heatmaps)
     No (internal tool, non-regulated)    -> LSTM or GRU (simpler)
-
   QUESTION 4: How much data do you have?
     Small dataset (<1K sequences) -> GRU (fewer parameters, less overfitting)
     Large dataset (>10K sequences) -> LSTM+Attention (can leverage capacity)
-
   Results from THIS experiment on {PRIMARY}:
     Best accuracy:     {best_name} (val={best_val:.4f})
     Most efficient:    GRU ({param_counts['GRU']:,} params)
@@ -476,8 +406,6 @@ print(
     Best gradient flow: LSTM or LSTM+Attention (gated architectures)
 """
 )
-
-
 # ══════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ══════════════════════════════════════════════════════════════════════
@@ -501,20 +429,16 @@ print(
       - SGX/DBS: Equity forecasting with prediction intervals (LSTM)
       - SMRT: Predictive maintenance for trains (GRU)
       - SGH: Clinical deterioration prediction with explainability (Attention)
-
   Key insight: There is no single "best" architecture. The right choice
   depends on sequence length, latency requirements, explainability needs,
   and data volume. RNNs fail on long sequences. LSTMs fix this with
   additive cell-state updates. GRUs match with fewer parameters. Attention
   lets the model choose which past steps matter. Error compounds across
   the forecast horizon.
-
   This exercise teaches architectures, not market timing.
-
   Next: Exercise 4 — Transformers replace recurrence with pure attention.
 """
 )
-
 # ════════════════════════════════════════════════════════════════════════
 print(f"\n== Training all four on {PRIMARY} (identical conditions) ==")
 all_results = {}
@@ -531,21 +455,15 @@ for name, model in models.items():
         attn=is_attn[name],
     )
     all_results[name] = results
-
     # Per-architecture diagnostic — the comparison is the teaching
     # moment: VanillaRNN should light up CRITICAL while LSTM/GRU/
     # Attention stay HEALTHY on the same task and identical data.
-    from shared.mlfp05.diagnostics import diagnose_regressor
-
+    from kailash_ml import diagnose
     print(f"  ── Diagnostic Report ({name}) ──")
-    _diag, _findings = diagnose_regressor(
+    report = diagnose(
         model,
-        val_loader,
-        title=name,
-        n_batches=4,
-        train_losses=results["train_losses"],
-        val_losses=results.get("val_losses"),
-        forward_returns_tuple=is_attn[name],
+        kind="dl",
+        data=val_loader,
         show=False,
     )
     # ══════ EXPECTED OUTPUT (synthesized reference — side-by-side across 4 architectures) ══════
@@ -620,14 +538,11 @@ for name, model in models.items():
     #  architectures, line them up on the five instruments, not just
     #  on final accuracy.
     # ═════════════════════════════════════════════════════════════════════
-
 # ── Checkpoint 3 ─────────────────────────────────────────────────────
 for name, res in all_results.items():
     assert len(res["train_losses"]) == EPOCHS, f"{name} should have {EPOCHS} epochs"
     assert res["final_val_loss"] < 5.0, f"{name} val loss suspiciously high"
 print("\n--- Checkpoint 3 passed --- all four architectures trained\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 4 — Comprehensive comparison table
 # ════════════════════════════════════════════════════════════════════════
@@ -641,20 +556,15 @@ for name, res in all_results.items():
         f"{np.mean(res['gradient_norms']):>10.4f}"
     )
 print("=" * 80)
-
 best_name = min(all_results, key=lambda k: all_results[k]["final_val_loss"])
 best_val = all_results[best_name]["final_val_loss"]
 print(f"\n  Best model: {best_name} (val_loss={best_val:.4f})")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 5 — Inference latency benchmark
 # ════════════════════════════════════════════════════════════════════════
 def _predict_for_bench(model, x, attn=False):
     out = model(x)
     return out[0] if attn else out
-
-
 def benchmark_inference(
     model: nn.Module, name: str, attn: bool, n_runs: int = 200
 ) -> float:
@@ -673,25 +583,19 @@ def benchmark_inference(
         torch.cuda.synchronize()
     elapsed_ms = (time.perf_counter() - start) / n_runs * 1000
     return elapsed_ms
-
-
 print("\n== Inference Latency ==")
 latencies = {}
 for name, model in models.items():
     lat = benchmark_inference(model, name, is_attn[name])
     latencies[name] = lat
     print(f"  {name}: {lat:.3f} ms/inference")
-
 fastest = min(latencies, key=latencies.get)
 print(f"  Fastest: {fastest} ({latencies[fastest]:.3f} ms)")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 6 — Multi-stock generalisation test
 # ════════════════════════════════════════════════════════════════════════
 print(f"\n== Multi-Stock Generalisation ({best_name}) ==")
 multi_stock_results: dict[str, float] = {PRIMARY: best_val}
-
 for symbol, sdf in stock_data.items():
     if symbol == PRIMARY or len(sdf) < SEQ_LEN + FORECAST_HORIZON + 50:
         continue
@@ -724,7 +628,6 @@ for symbol, sdf in stock_data.items():
     else:
         m = VanillaRNN(input_dim=N_FEATURES, hidden_dim=HIDDEN_DIM).to(device)
         attn_flag = False
-
     opt = torch.optim.Adam(m.parameters(), lr=LR)
     for _ in range(8):
         m.train()
@@ -746,20 +649,15 @@ for symbol, sdf in stock_data.items():
         )
     multi_stock_results[symbol] = vl
     print(f"  {symbol} ({TICKERS[symbol]}): val_loss={vl:.4f}")
-
 avg_cross_stock = np.mean(list(multi_stock_results.values()))
 print(f"\n  Average cross-stock val loss: {avg_cross_stock:.4f}")
-
 # ── Checkpoint 4 ─────────────────────────────────────────────────────
 assert len(multi_stock_results) >= 2, "Need multi-stock results"
 print("--- Checkpoint 4 passed --- multi-stock generalisation complete\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 7 — Comprehensive comparison dashboard
 # ════════════════════════════════════════════════════════════════════════
 viz = get_visualizer()
-
 # 7A: Training curves (all models overlaid)
 train_metrics = {}
 for label, res in all_results.items():
@@ -768,13 +666,11 @@ for label, res in all_results.items():
 viz.training_history(
     metrics=train_metrics, x_label="Epoch", y_label="MSE Loss"
 ).write_html(str(OUTPUT_DIR / "05_comparison_training_curves.html"))
-
 # 7B: Gradient norms (all models overlaid)
 grad_metrics = {k: v["gradient_norms"] for k, v in all_results.items()}
 viz.training_history(
     metrics=grad_metrics, x_label="Epoch", y_label="Gradient L2 Norm"
 ).write_html(str(OUTPUT_DIR / "05_comparison_gradient_norms.html"))
-
 # 7C: Prediction vs actual for best model
 best_model = models[best_name]
 best_model.eval()
@@ -784,18 +680,15 @@ with torch.no_grad():
     else:
         val_preds = best_model(X_val_t)
         val_attn_weights = None
-
 close_mean, close_std = norm_mean[0, 0], norm_std[0, 0]
 preds_denorm = val_preds.cpu().numpy() * close_std + close_mean
 actual_denorm = y_val_t.cpu().numpy() * close_std + close_mean
-
 pred_df = pl.DataFrame(
     {"actual": actual_denorm[:, 0].tolist(), "predicted": preds_denorm[:, 0].tolist()}
 )
 viz.scatter(pred_df, x="actual", y="predicted").write_html(
     str(OUTPUT_DIR / "05_comparison_pred_vs_actual.html")
 )
-
 # 7D: Comprehensive comparison figure (matplotlib)
 fig, axes = plt.subplots(2, 3, figsize=(20, 12))
 model_names = list(all_results.keys())
@@ -805,7 +698,6 @@ colors = {
     "GRU": "#4CAF50",
     "LSTM+Attention": "#FF9800",
 }
-
 # Panel 1: Val loss over epochs
 ax = axes[0, 0]
 for name in model_names:
@@ -821,7 +713,6 @@ ax.set_ylabel("Validation MSE Loss")
 ax.set_title("Learning Curves")
 ax.legend()
 ax.grid(True, alpha=0.3)
-
 # Panel 2: Gradient norms over epochs
 ax = axes[0, 1]
 for name in model_names:
@@ -837,7 +728,6 @@ ax.set_ylabel("Gradient L2 Norm")
 ax.set_title("Gradient Health")
 ax.legend()
 ax.grid(True, alpha=0.3)
-
 # Panel 3: Parameter count vs val loss (efficiency frontier)
 ax = axes[0, 2]
 for name in model_names:
@@ -861,7 +751,6 @@ ax.set_xlabel("Parameter Count")
 ax.set_ylabel("Final Val Loss")
 ax.set_title("Efficiency: Parameters vs Accuracy")
 ax.grid(True, alpha=0.3)
-
 # Panel 4: Latency comparison
 ax = axes[1, 0]
 bars = ax.bar(
@@ -883,7 +772,6 @@ for bar, name in zip(bars, model_names):
         fontweight="bold",
     )
 ax.grid(True, alpha=0.3, axis="y")
-
 # Panel 5: Predicted vs actual time series (best model)
 ax = axes[1, 1]
 n_show = 150
@@ -908,7 +796,6 @@ ax.set_ylabel("Close Price")
 ax.set_title(f"Best Model ({best_name}): Predicted vs Actual")
 ax.legend()
 ax.grid(True, alpha=0.3)
-
 # Panel 6: Multi-stock generalisation
 ax = axes[1, 2]
 stock_names = list(multi_stock_results.keys())
@@ -934,7 +821,6 @@ ax.set_ylabel("Validation Loss")
 ax.set_title(f"Multi-Stock Generalisation ({best_name})")
 ax.legend()
 ax.grid(True, alpha=0.3, axis="y")
-
 fig.suptitle(
     f"Architecture Comparison: RNN vs LSTM vs GRU vs Attention on {PRIMARY}",
     fontsize=15,
@@ -944,14 +830,12 @@ fig.tight_layout()
 fig.savefig(str(OUTPUT_DIR / "05_comparison_dashboard.png"), dpi=150)
 plt.close(fig)
 print("  Saved: 05_comparison_dashboard.png")
-
 # 7E: Horizon error by day for all models
 print("\n== Forecast Error by Horizon Day (all models) ==")
 print(f"  {'Day':<6s}", end="")
 for name in model_names:
     print(f"  {name:>16s}", end="")
 print()
-
 all_horizon_rmses = {}
 for name in model_names:
     model = models[name]
@@ -967,20 +851,16 @@ for name in model_names:
         rmse = float(np.mean((vp_denorm[:, day] - actual_denorm[:, day]) ** 2)) ** 0.5
         rmses.append(rmse)
     all_horizon_rmses[name] = rmses
-
 for day in range(FORECAST_HORIZON):
     print(f"  Day {day+1:<3d}", end="")
     for name in model_names:
         print(f"  {all_horizon_rmses[name][day]:>16.2f}", end="")
     print()
-
 # ── Checkpoint 5 ─────────────────────────────────────────────────────
 assert (OUTPUT_DIR / "05_comparison_dashboard.png").exists()
 assert (OUTPUT_DIR / "05_comparison_training_curves.html").exists()
 assert (OUTPUT_DIR / "05_comparison_pred_vs_actual.html").exists()
 print("\n--- Checkpoint 5 passed --- comparison dashboard generated\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 8 — Register overall best model
 # ════════════════════════════════════════════════════════════════════════
@@ -992,12 +872,9 @@ register_best_model(
     registry,
     has_registry,
 )
-
 # ── Checkpoint 6 ─────────────────────────────────────────────────────
 assert best_val < 5.0, "Best model val loss should be reasonable"
 print("--- Checkpoint 6 passed --- best model registered\n")
-
-
 # ════════════════════════════════════════════════════════════════════════
 # TASK 9 — Architecture selection guide (decision framework)
 # ════════════════════════════════════════════════════════════════════════
@@ -1007,24 +884,19 @@ print("=" * 80)
 print(
     f"""
   Based on the experiments above, here is a decision framework:
-
   QUESTION 1: How long are your sequences?
     < 10 steps  -> VanillaRNN (simplest, fastest, adequate)
     10-200 steps -> LSTM or GRU (gates preserve long-range dependencies)
     > 200 steps  -> Transformer (Exercise 4 — parallel self-attention)
-
   QUESTION 2: Does latency matter?
     Yes (real-time, sensor, trading) -> GRU ({latencies['GRU']:.3f}ms vs LSTM {latencies['LSTM']:.3f}ms)
     No (batch, offline, training)    -> LSTM or LSTM+Attention
-
   QUESTION 3: Do you need explainability?
     Yes (healthcare, finance, regulated) -> LSTM+Attention (attention heatmaps)
     No (internal tool, non-regulated)    -> LSTM or GRU (simpler)
-
   QUESTION 4: How much data do you have?
     Small dataset (<1K sequences) -> GRU (fewer parameters, less overfitting)
     Large dataset (>10K sequences) -> LSTM+Attention (can leverage capacity)
-
   Results from THIS experiment on {PRIMARY}:
     Best accuracy:     {best_name} (val={best_val:.4f})
     Most efficient:    GRU ({param_counts['GRU']:,} params)
@@ -1032,8 +904,26 @@ print(
     Best gradient flow: LSTM or LSTM+Attention (gated architectures)
 """
 )
-
-
+# ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson walked the journey of recurrent architectures — VanillaRNN,
+# LSTM, GRU, LSTM+Attention — each with its own training loop, gradient
+# norm tracking, and benchmark grid. The kailash-ml SDK ships a
+# single-call diagnostic primitive that closes the production loop:
+# km.diagnose inspects a trained model and emits an auto-dashboard
+# (loss curves, gradient flow, dead neurons, activation stats, weight
+# distributions). One cell. Every diagnostic students would otherwise
+# hand-roll, ready to surface in a Plotly dashboard.
+from kailash_ml import diagnose
+# `kind='auto'` dispatches by model type — DLDiagnostics for torch.nn.Module.
+# `data=` accepts any iterable yielding tensors; we reuse val_loader.
+report = diagnose(best_model, kind="auto", data=val_loader, show=False)
+report.plot_training_dashboard()
+print()
+print("km.diagnose: 1 line of code -> the same observability the lesson")
+print("body hand-rolled in 200+ lines. This is what 'destination-first'")
+print("means — when the journey is internalised, the SDK is one call.")
 # ══════════════════════════════════════════════════════════════════════
 # REFLECTION
 # ══════════════════════════════════════════════════════════════════════
@@ -1057,17 +947,13 @@ print(
       - SGX/DBS: Equity forecasting with prediction intervals (LSTM)
       - SMRT: Predictive maintenance for trains (GRU)
       - SGH: Clinical deterioration prediction with explainability (Attention)
-
   Key insight: There is no single "best" architecture. The right choice
   depends on sequence length, latency requirements, explainability needs,
   and data volume. RNNs fail on long sequences. LSTMs fix this with
   additive cell-state updates. GRUs match with fewer parameters. Attention
   lets the model choose which past steps matter. Error compounds across
   the forecast horizon.
-
   This exercise teaches architectures, not market timing.
-
   Next: Exercise 4 — Transformers replace recurrence with pure attention.
 """
 )
-

@@ -459,18 +459,10 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — GRU (3 gates vs LSTM's 4)
 # ══════════════════════════════════════════════════════════════════
-from shared.mlfp05.diagnostics import diagnose_regressor
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (GRU) ──")
-diag, findings = diagnose_regressor(
-    gru_model,
-    val_loader,
-    title="GRU",
-    n_batches=8,
-    train_losses=gru_results["train_losses"],
-    val_losses=gru_results.get("val_losses"),
-    show=False,
-)
+report = diagnose(gru_model, kind="dl", data=val_loader, show=False)
 # ══════ EXPECTED OUTPUT (synthesized reference — full run produces similar pattern) ══════
 # ════════════════════════════════════════════════════════════════
 #   DL Diagnostics Report — Prescription Pad

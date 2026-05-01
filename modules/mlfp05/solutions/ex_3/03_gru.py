@@ -200,18 +200,10 @@ gru_results = train_model(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — GRU (3 gates vs LSTM's 4)
 # ══════════════════════════════════════════════════════════════════
-from shared.mlfp05.diagnostics import diagnose_regressor
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (GRU) ──")
-diag, findings = diagnose_regressor(
-    gru_model,
-    val_loader,
-    title="GRU",
-    n_batches=8,
-    train_losses=gru_results["train_losses"],
-    val_losses=gru_results.get("val_losses"),
-    show=False,
-)
+report = diagnose(gru_model, kind="dl", data=val_loader, show=False)
 # ══════ EXPECTED OUTPUT (synthesized reference — full run produces similar pattern) ══════
 # ════════════════════════════════════════════════════════════════
 #   DL Diagnostics Report — Prescription Pad
@@ -319,10 +311,18 @@ print("--- Checkpoint 4 passed --- head-to-head comparison complete\n")
 # translate to measurable speed gains.
 
 
-def benchmark_inference(model: nn.Module, name: str, n_runs: int = 100) -> float:
+def benchmark_inference(
+    model: nn.Module, name: str, n_runs: int = 100, n_features: int | None = None
+) -> float:
     """Measure average inference latency in milliseconds."""
     model.eval()
-    test_input = torch.randn(1, SEQ_LEN, N_FEATURES, device=device)
+    # Use the model's actual input_size (sensor models use input_dim=1,
+    # stock models use input_dim=N_FEATURES). Falling back to N_FEATURES
+    # was a bug — sensor_gru got 4-feature data and crashed.
+    if n_features is None:
+        gru_layer = getattr(model, "gru", None) or getattr(model, "lstm", None)
+        n_features = gru_layer.input_size if gru_layer is not None else N_FEATURES
+    test_input = torch.randn(1, SEQ_LEN, n_features, device=device)
 
     # Warmup
     with torch.no_grad():

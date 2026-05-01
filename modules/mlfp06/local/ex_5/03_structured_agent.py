@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from kaizen import InputField, OutputField, Signature
 from kaizen.core.base_agent import BaseAgent
 
+from shared.mlfp06._ollama_bootstrap import OLLAMA_BASE_URL
 from shared.mlfp06.ex_5 import MODEL, data_summary, load_hotpotqa, make_tools
 
 # ════════════════════════════════════════════════════════════════════════
@@ -109,7 +110,9 @@ print("✓ Checkpoint 2 passed — DataAnalysisSignature declared\n")
 # to DefaultSignature. Pass the signature as an INSTANCE in super().
 @dataclass
 class DataAnalysisConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = os.environ.get("LLM_PROVIDER", "ollama")
+
+    base_url: str = os.environ.get("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
     model: str = MODEL
     temperature: float = 0.2
     # TODO: Set budget_limit_usd = 1.0 (replaces legacy max_llm_cost_usd)

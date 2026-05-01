@@ -3,40 +3,39 @@
 """
 Shared infrastructure for MLFP06 Exercise 1 — Prompt Engineering.
 
-Contains: LLM model resolution, SST-2 dataset loading, Kaizen Delegate
-wrappers, accuracy/cost/latency metrics, label normalisation.
+Contains: SST-2 dataset loading, Ollama-backed Kaizen Delegate wrappers,
+accuracy/tokens/latency metrics, label normalisation.
 
 Technique-specific code (prompt templates, reasoning extraction, majority
 vote, structured output Signatures) does NOT belong here — it lives in
 the per-technique files.
+
+Provider note: every LLM call routes through ``shared.mlfp06._ollama_bootstrap``
+to a locally-running Ollama daemon. There is NO silent OpenAI fallback —
+``OllamaUnreachableError`` propagates so a missing daemon surfaces loudly.
 """
 from __future__ import annotations
 
-import os
-import time
 from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
 import polars as pl
-from dotenv import load_dotenv
-
-from kaizen_agents import Delegate
 
 from shared.kailash_helpers import setup_environment
+from shared.mlfp06._ollama_bootstrap import (
+    DEFAULT_CHAT_MODEL,
+    make_delegate,
+    run_delegate_text,
+)
 
 # ════════════════════════════════════════════════════════════════════════
 # ENVIRONMENT SETUP
 # ════════════════════════════════════════════════════════════════════════
 
 setup_environment()
-load_dotenv()
 
-MODEL = os.environ.get("DEFAULT_LLM_MODEL", os.environ.get("OPENAI_PROD_MODEL"))
-if not MODEL:
-    raise EnvironmentError(
-        "Set DEFAULT_LLM_MODEL or OPENAI_PROD_MODEL in .env before running"
-    )
+MODEL = DEFAULT_CHAT_MODEL
 
 CATEGORIES: list[str] = ["positive", "negative"]
 DEFAULT_EVAL_N: int = 20
@@ -91,38 +90,21 @@ def get_eval_docs(n: int = DEFAULT_EVAL_N) -> pl.DataFrame:
 # ════════════════════════════════════════════════════════════════════════
 
 
-async def run_delegate(prompt: str, max_cost: float = 0.5) -> tuple[str, float, float]:
-    """Run a Kaizen Delegate call and return (text, cost_usd, elapsed_s).
+async def run_delegate(prompt: str) -> tuple[str, int, float]:
+    """Run an Ollama-backed Delegate and return ``(text, total_tokens, elapsed_s)``.
 
-    Uses the MODEL resolved from the environment. Never hardcode models.
+    Per ``rules/zero-tolerance.md`` Rule 2 there is NO silent stub fallback:
+    if the Ollama daemon is unreachable, the underlying ``OllamaUnreachableError``
+    propagates so the student fixes the environment instead of seeing a
+    fake-zero accuracy result.
 
-    Offline-graceful: if the OpenAI key is missing or the provider call
-    fails, returns an empty deterministic stub so smoke tests can run
-    without burning real API calls. Production callers should check
-    ``cost > 0`` to distinguish a real call from the offline path.
+    Note: the previous OpenAI-backed signature returned ``cost_usd`` instead of
+    ``total_tokens``. Ollama is free, so cost is meaningless; tokens are the
+    honest "load each technique put on the model" signal.
     """
-    # kaizen_agents 0.9.x: budget moved to `budget_usd`, and DelegateEvent
-    # is now a typed union. Text accumulates from TextDelta.text (streaming)
-    # or TurnComplete.text (final). Cost reads from delegate.consumed_usd
-    # after the stream ends — there is no per-event .cost attribute anymore.
-    t0 = time.perf_counter()
-    try:
-        delegate = Delegate(model=MODEL, budget_usd=max_cost)
-        response = ""
-        async for event in delegate.run(prompt):
-            text_chunk = getattr(event, "text", None)
-            if text_chunk:
-                response += text_chunk
-        cost = float(delegate.consumed_usd)
-        elapsed = time.perf_counter() - t0
-        return response, cost, elapsed
-    except Exception as exc:
-        # Offline / missing-key / provider-down — fall back to a stub
-        # response that satisfies the downstream `normalise_label` path
-        # (returns "unknown") without crashing the exercise.
-        elapsed = time.perf_counter() - t0
-        print(f"  [offline] run_delegate fallback: {type(exc).__name__}: {exc}")
-        return "unknown", 0.0, elapsed
+    delegate = make_delegate(model=MODEL)
+    text, usage, elapsed = await run_delegate_text(delegate, prompt)
+    return text, usage["total_tokens"], elapsed
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -156,9 +138,12 @@ def normalise_label(raw: str) -> str:
 
 
 def compute_metrics(results: list[dict], name: str) -> dict[str, Any]:
-    """Compute accuracy, total_cost, avg_latency from a results list.
+    """Compute accuracy, total_tokens, avg_latency from a results list.
 
-    Each result dict must have keys: correct (bool), cost (float), elapsed (float).
+    Each result dict must have keys: correct (bool), tokens (int), elapsed (float).
+    The Ollama migration replaced the previous ``cost`` field with ``tokens`` —
+    a free local provider has no cost to report, but token throughput is the
+    honest comparison signal across techniques.
     """
     n = len(results)
     if n == 0:
@@ -166,27 +151,27 @@ def compute_metrics(results: list[dict], name: str) -> dict[str, Any]:
             "strategy": name,
             "n": 0,
             "accuracy": 0.0,
-            "total_cost": 0.0,
+            "total_tokens": 0,
             "avg_latency_s": 0.0,
         }
     acc = sum(r["correct"] for r in results) / n
-    total_cost = sum(r.get("cost", 0.0) for r in results)
+    total_tokens = sum(int(r.get("tokens", 0)) for r in results)
     avg_latency = sum(r.get("elapsed", 0.0) for r in results) / n
     return {
         "strategy": name,
         "n": n,
         "accuracy": acc,
-        "total_cost": total_cost,
+        "total_tokens": total_tokens,
         "avg_latency_s": avg_latency,
     }
 
 
 def print_summary(results: list[dict], name: str) -> None:
-    """Print a one-line accuracy/cost/latency summary for a technique."""
+    """Print a one-line accuracy/tokens/latency summary for a technique."""
     m = compute_metrics(results, name)
     print(
         f"  {name}: accuracy={m['accuracy']:.0%} | "
-        f"cost=${m['total_cost']:.4f} | "
+        f"tokens={m['total_tokens']} | "
         f"avg_latency={m['avg_latency_s']:.2f}s | n={m['n']}"
     )
 
@@ -224,7 +209,7 @@ def plot_accuracy_bars(
     names = list(cat_total.keys())
     accs = [cat_correct[c] / max(cat_total[c], 1) for c in names]
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    _, ax = plt.subplots(figsize=(6, 4))
     bars = ax.bar(names, accs, color=["steelblue", "darkorange"], edgecolor="white")
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("Accuracy")
@@ -250,10 +235,10 @@ def plot_comparison_bars(
     title: str,
     filename: str,
 ) -> None:
-    """Grouped bar chart comparing accuracy, cost, and latency across strategies."""
+    """Grouped bar chart comparing accuracy, tokens, and latency across strategies."""
     names = [m["strategy"] for m in metrics_list]
     accs = [m["accuracy"] for m in metrics_list]
-    costs = [m["total_cost"] for m in metrics_list]
+    tokens = [m["total_tokens"] for m in metrics_list]
     latencies = [m["avg_latency_s"] for m in metrics_list]
 
     fig, axes = plt.subplots(1, 3, figsize=(14, 4))
@@ -276,9 +261,9 @@ def plot_comparison_bars(
     for i, v in enumerate(accs):
         axes[0].text(i, v + 0.02, f"{v:.0%}", ha="center", fontsize=9)
 
-    axes[1].bar(names, costs, color=colors, edgecolor="white")
-    axes[1].set_ylabel("Total cost (USD)")
-    axes[1].set_title("Cost")
+    axes[1].bar(names, tokens, color=colors, edgecolor="white")
+    axes[1].set_ylabel("Total tokens")
+    axes[1].set_title("Tokens")
     axes[1].tick_params(axis="x", rotation=30)
 
     axes[2].bar(names, latencies, color=colors, edgecolor="white")
@@ -293,13 +278,13 @@ def plot_comparison_bars(
     print(f"  Saved: {fname}")
 
 
-def plot_cost_vs_accuracy(
+def plot_tokens_vs_accuracy(
     metrics_list: list[dict[str, Any]],
     title: str,
     filename: str,
 ) -> None:
-    """Scatter plot of cost vs accuracy across strategies."""
-    fig, ax = plt.subplots(figsize=(7, 5))
+    """Scatter plot of total tokens consumed vs accuracy across strategies."""
+    _, ax = plt.subplots(figsize=(7, 5))
     colors = [
         "steelblue",
         "darkorange",
@@ -310,7 +295,7 @@ def plot_cost_vs_accuracy(
     ]
     for i, m in enumerate(metrics_list):
         ax.scatter(
-            m["total_cost"],
+            m["total_tokens"],
             m["accuracy"],
             s=120,
             color=colors[i % len(colors)],
@@ -320,12 +305,12 @@ def plot_cost_vs_accuracy(
         )
         ax.annotate(
             m["strategy"],
-            (m["total_cost"], m["accuracy"]),
+            (m["total_tokens"], m["accuracy"]),
             textcoords="offset points",
             xytext=(8, 4),
             fontsize=9,
         )
-    ax.set_xlabel("Total cost (USD)")
+    ax.set_xlabel("Total tokens")
     ax.set_ylabel("Accuracy")
     ax.set_ylim(0, 1.05)
     ax.set_title(title, fontsize=13, fontweight="bold")
@@ -337,6 +322,10 @@ def plot_cost_vs_accuracy(
     print(f"  Saved: {fname}")
 
 
+# Backwards-compat alias for any caller still importing the old name.
+plot_cost_vs_accuracy = plot_tokens_vs_accuracy
+
+
 def plot_vote_agreement(
     results: list[dict],
     n_samples: int,
@@ -345,7 +334,7 @@ def plot_vote_agreement(
 ) -> None:
     """Histogram of vote-agreement counts for self-consistency results."""
     agreement_counts = [len(set(r["votes"])) for r in results]
-    fig, ax = plt.subplots(figsize=(6, 4))
+    _, ax = plt.subplots(figsize=(6, 4))
     ax.hist(
         agreement_counts,
         bins=range(1, n_samples + 2),
@@ -395,7 +384,7 @@ def plot_extraction_accuracy(
     names = list(field_fill.keys())
     rates = list(field_fill.values())
 
-    fig, ax = plt.subplots(figsize=(7, 4))
+    _, ax = plt.subplots(figsize=(7, 4))
     colors = [
         "seagreen" if r >= 0.9 else "darkorange" if r >= 0.5 else "crimson"
         for r in rates

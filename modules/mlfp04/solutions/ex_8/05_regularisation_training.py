@@ -31,7 +31,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from kailash_ml.bridge.onnx_bridge import OnnxBridge
+from kailash_ml import OnnxBridge
 
 from shared.mlfp04.ex_8 import (
     N_CLASSES,

@@ -160,8 +160,8 @@ async def train_vanilla_gan(epochs: int = EPOCHS, lr: float = LR):
     # Capture initial state (random noise output)
     epoch_snapshots[0] = copy.deepcopy(G.state_dict())
 
-    async with tracker.run(experiment_name=exp_name, run_name="vanilla_gan") as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name="vanilla_gan") as run:
+        await run.log_params(
             {
                 "architecture": "Vanilla_GAN_MLP",
                 "latent_dim": str(LATENT_DIM),
@@ -201,7 +201,7 @@ async def train_vanilla_gan(epochs: int = EPOCHS, lr: float = LR):
             avg_g, avg_d = float(np.mean(eg)), float(np.mean(ed))
             g_losses.append(avg_g)
             d_losses.append(avg_d)
-            await ctx.log_metrics({"g_loss": avg_g, "d_loss": avg_d}, step=epoch + 1)
+            await run.log_metrics({"g_loss": avg_g, "d_loss": avg_d}, step=epoch + 1)
             print(
                 f"  [Vanilla GAN] epoch {epoch+1:2d}/{epochs}  "
                 f"D={avg_d:.3f}  G={avg_g:.3f}"
@@ -211,7 +211,7 @@ async def train_vanilla_gan(epochs: int = EPOCHS, lr: float = LR):
             if (epoch + 1) in {1, 5, 10, 15}:
                 epoch_snapshots[epoch + 1] = copy.deepcopy(G.state_dict())
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {"final_g_loss": g_losses[-1], "final_d_loss": d_losses[-1]}
         )
 
@@ -229,7 +229,7 @@ G_gan, gan_g_losses, gan_d_losses, gan_snapshots = asyncio.run(train_vanilla_gan
 # can see which side is "winning" and which side is starving for
 # signal. The `train_losses` we replay into each diag are the per-
 # epoch losses already captured above.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 import torch.nn.functional as _F
 
 

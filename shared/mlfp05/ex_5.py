@@ -20,17 +20,17 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import torchvision
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 
 from kailash.db import ConnectionManager
-from kailash_ml import ModelVisualizer
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
-from kailash_ml.engines.model_registry import ModelRegistry
+from kailash_ml import ExperimentTracker
+from kailash_ml import ModelRegistry
 from kailash_ml.types import MetricSpec
 
 from shared.kailash_helpers import get_device, setup_environment
 
 if TYPE_CHECKING:
-    from kailash_ml.engines.model_registry import ModelVersion
+    from kailash_ml import ModelVersion
 
 # ════════════════════════════════════════════════════════════════════════
 # Constants
@@ -38,9 +38,14 @@ if TYPE_CHECKING:
 LATENT_DIM = 64
 IMG_DIM = 28 * 28
 BATCH_SIZE = 128
-REPO_ROOT = Path(__file__).resolve().parents[2]
+try:
+    _HERE = Path(__file__).resolve()
+    REPO_ROOT = _HERE.parents[2]
+    OUTPUT_DIR = _HERE.parent
+except NameError:
+    REPO_ROOT = Path.cwd()
+    OUTPUT_DIR = Path.cwd()
 DATA_DIR = REPO_ROOT / "data" / "mlfp05" / "mnist"
-OUTPUT_DIR = Path(__file__).resolve().parent
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -101,26 +106,23 @@ def load_mnist(device: torch.device) -> tuple[torch.Tensor, torch.Tensor, DataLo
 def setup_engines() -> (
     tuple[ConnectionManager, ExperimentTracker, str, ModelRegistry | None]
 ):
-    """Create ExperimentTracker and ModelRegistry for GAN experiments.
+    """Create ExperimentTracker (kailash-ml 1.1.1 factory) and ModelRegistry.
 
     Returns:
-        conn, tracker, experiment_name, registry (or None)
+        conn, tracker, experiment_name, registry
     """
 
     async def _setup():
-        conn = ConnectionManager("sqlite:///mlfp05_gans.db")
+        # Schema-conflict workaround (kailash-ml 1.5.x): ExperimentTracker
+        # and ModelRegistry use incompatible _kml_model_versions schemas.
+        # Route them to separate sqlite files until upstream fixes the conflict.
+        db = "sqlite:///mlfp05_gans.db"
+        registry_db = "sqlite:///mlfp05_gans_registry.db"
+        tracker = await ExperimentTracker.create(store_url=db)
+        conn = ConnectionManager(registry_db)
         await conn.initialize()
-        tracker = ExperimentTracker(conn)
-        exp_name = await tracker.create_experiment(
-            name="m5_gans",
-            description="GAN variants on MNIST (60K images)",
-        )
-        try:
-            registry = ModelRegistry(conn)
-        except Exception as e:
-            registry = None
-            print(f"  Note: ModelRegistry setup skipped ({e})")
-        return conn, tracker, exp_name, registry
+        registry = ModelRegistry(conn)
+        return conn, tracker, "m5_gans", registry
 
     return asyncio.run(_setup())
 
@@ -320,7 +322,7 @@ def plot_image_grid(
     ncol: int = 8,
     title: str = "Generated Images",
     save_path: str | None = None,
-) -> plt.Figure:
+) -> Figure:
     """Plot an 8x8 grid of generated images.
 
     Args:
@@ -355,7 +357,7 @@ def plot_latent_interpolation(
     n_rows: int = 5,
     title: str = "Latent Space Interpolation",
     save_path: str | None = None,
-) -> plt.Figure:
+) -> Figure:
     """Interpolate between pairs of random latent vectors.
 
     Shows smooth transitions between generated images — evidence that
@@ -390,7 +392,7 @@ def plot_training_progression(
     epoch_snapshots: dict[int, dict],
     title: str = "Training Progression",
     save_path: str | None = None,
-) -> plt.Figure:
+) -> Figure:
     """Plot generated images at different training epochs.
 
     Shows how generation quality improves over training — from random
@@ -436,7 +438,7 @@ def plot_loss_curves(
     g_label: str = "Generator",
     d_label: str = "Discriminator",
     save_path: str | None = None,
-) -> plt.Figure:
+) -> Figure:
     """Plot G vs D loss curves across epochs."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     fig.suptitle(title, fontsize=14, fontweight="bold")

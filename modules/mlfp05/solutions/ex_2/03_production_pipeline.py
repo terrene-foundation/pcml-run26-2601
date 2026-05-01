@@ -60,8 +60,8 @@ from shared.mlfp05.ex_2 import (
     register_model,
     train_model,
 )
-from kailash_ml.bridge.onnx_bridge import OnnxBridge
-from kailash_ml.engines.inference_server import InferenceServer
+from kailash_ml import OnnxBridge
+from kailash_ml import InferenceServer
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -223,18 +223,10 @@ resnet_losses, resnet_accs = train_model(
 # Running diagnostics BEFORE ONNX export is deployment hygiene: you
 # never want to ship a model that is secretly pathological. A clean
 # Prescription Pad is table stakes for production release.
-from shared.mlfp05.diagnostics import diagnose_classifier
+from kailash_ml import diagnose
 
 print("\n── Pre-Export Diagnostic Report (ResNetSE) ──")
-diag, findings = diagnose_classifier(
-    resnet_se,
-    val_loader,
-    title="ResNetSE pre-ONNX",
-    n_batches=8,
-    train_losses=resnet_losses,
-    val_losses=[1.0 - a for a in resnet_accs],
-    show=False,
-)
+report = diagnose(resnet_se, kind="dl", data=val_loader, show=False)
 # ══════ EXPECTED OUTPUT (synthesized reference — full run produces similar pattern) ══════
 # ════════════════════════════════════════════════════════════════
 #   DL Diagnostics Report — Prescription Pad
@@ -433,20 +425,27 @@ print("=" * 70)
 
 
 async def setup_inference_server():
-    """Demonstrate InferenceServer with ModelRegistry."""
+    """Demonstrate InferenceServer with ModelRegistry.
+
+    kailash-ml 1.5.x changed InferenceServer to bind one model per server
+    instance (via ``InferenceServer.from_registry(name, registry=...)``).
+    The earlier "cache_size + warm_cache(many)" pattern is gone — each
+    server now has a single (model_name, version) binding resolved at
+    construction. This is closer to how production model-serving is
+    deployed (one workload per pod).
+    """
     if not has_registry:
         print("  ModelRegistry not available -- skipping InferenceServer demo")
         return None
 
-    server = InferenceServer(registry=registry, cache_size=5)
-
     try:
-        await server.warm_cache(["resnet_se_cifar10"])
-        print("  InferenceServer cache warmed with resnet_se_cifar10")
+        server = InferenceServer.from_registry("resnet_se_cifar10", registry=registry)
+        print("  InferenceServer (1.5.x): bound to resnet_se_cifar10")
+        return server
     except Exception as e:
-        print(f"  Cache warm note: {e}")
-
-    return server
+        # Model may not be registered (e.g. registry empty in fresh runs)
+        print(f"  InferenceServer demo skipped: {type(e).__name__}: {e}")
+        return None
 
 
 server = asyncio.run(setup_inference_server())

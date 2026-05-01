@@ -34,7 +34,7 @@ from shared.mlfp06.ex_1 import (
     get_eval_docs,
     normalise_label,
     plot_comparison_bars,
-    plot_cost_vs_accuracy,
+    plot_tokens_vs_accuracy,
     print_summary,
     run_delegate,
 )
@@ -90,9 +90,9 @@ Review: "{text[:800]}"
 
 Step-by-step reasoning:"""
 
-    response, cost, elapsed = await run_delegate(prompt)
+    response, tokens, elapsed = await run_delegate(prompt)
     reasoning = response.strip()
-    return normalise_label(reasoning), reasoning, cost, elapsed
+    return normalise_label(reasoning), reasoning, tokens, elapsed
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -106,7 +106,7 @@ async def evaluate() -> list[dict]:
     for i, (text, true_label) in enumerate(
         zip(docs["text"].to_list(), docs["label"].to_list())
     ):
-        pred, reasoning, cost, elapsed = await cot_classify(text)
+        pred, reasoning, tokens, elapsed = await cot_classify(text)
         correct = pred == true_label
         results.append(
             {
@@ -114,7 +114,7 @@ async def evaluate() -> list[dict]:
                 "pred": pred,
                 "true": true_label,
                 "correct": correct,
-                "cost": cost,
+                "tokens": tokens,
                 "elapsed": elapsed,
                 "reasoning": reasoning,
             }
@@ -153,14 +153,14 @@ print_summary(cot_results, "Chain-of-Thought")
 zero_shot_expected = {
     "strategy": "Zero-Shot",
     "accuracy": 0.80,
-    "total_cost": 0.002,
+    "total_tokens": 1500,
     "avg_latency_s": 1.0,
     "n": 20,
 }
 few_shot_expected = {
     "strategy": "Few-Shot",
     "accuracy": 0.85,
-    "total_cost": 0.006,
+    "total_tokens": 5400,
     "avg_latency_s": 1.2,
     "n": 20,
 }
@@ -173,7 +173,7 @@ plot_comparison_bars(
     filename="ex1_03_cot_comparison.png",
 )
 
-plot_cost_vs_accuracy(
+plot_tokens_vs_accuracy(
     all_methods,
     title="Cost vs Accuracy — Prompting Ladder So Far",
     filename="ex1_03_cost_vs_accuracy.png",

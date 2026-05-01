@@ -31,7 +31,15 @@ from __future__ import annotations
 import asyncio
 
 import polars as pl
-from kailash_align import AdapterRegistry, AlignmentConfig, AlignmentPipeline
+from kailash_align import (
+    AdapterRegistry,
+    AdapterSignature,
+    AlignmentConfig,
+    AlignmentPipeline,
+    DPOConfig,
+    LoRAConfig,
+    SFTConfig,
+)
 
 from shared.mlfp06.ex_3 import (
     ADAPTER_OUTPUT_DIR,
@@ -59,19 +67,24 @@ print("=" * 70)
 print("TASK 1: Build DPO AlignmentConfig")
 print("=" * 70)
 
-# TODO: Configure AlignmentConfig for DPO:
-#   method="dpo", base_model=BASE_MODEL, dataset_format="preference",
-#   beta=0.1, lora_r=16, lora_alpha=32, lora_dropout=0.05,
-#   target_modules=["q_proj", "v_proj"], num_epochs=2, batch_size=2,
-#   learning_rate=5e-5, warmup_ratio=0.1, max_seq_length=512,
-#   gradient_accumulation_steps=4, output_dir=str(ADAPTER_OUTPUT_DIR)
+# TODO: Configure AlignmentConfig for DPO. kailash-align 0.6.0+ uses a
+# composed shape — top-level method + base_model_id + experiment_dir,
+# plus LoRAConfig + SFTConfig + DPOConfig sub-configs. Build:
+#   method="dpo", base_model_id=BASE_MODEL,
+#   lora=LoRAConfig(rank=16, alpha=32,
+#                   target_modules=("q_proj","v_proj"), dropout=0.05),
+#   sft=SFTConfig(),  # unused for DPO but required by the constructor
+#   dpo=DPOConfig(num_train_epochs=2, per_device_train_batch_size=2,
+#                 gradient_accumulation_steps=4, learning_rate=5e-5,
+#                 warmup_ratio=0.1, max_length=512, beta=0.1),
+#   experiment_dir=str(ADAPTER_OUTPUT_DIR)
 dpo_config = ____
 
 print(f"  Method: {dpo_config.method}")
-print(f"  Beta:   {dpo_config.beta}")
+print(f"  Beta:   {dpo_config.dpo.beta}")
 
 assert dpo_config.method == "dpo"
-assert dpo_config.dataset_format == "preference"
+assert dpo_config.dpo.beta == 0.1
 print("✓ Checkpoint 1 passed\n")
 
 
@@ -117,11 +130,18 @@ print("=" * 70)
 
 async def register_adapter() -> str:
     registry = AdapterRegistry()
-    # TODO: Call registry.register() with:
-    #   name="ultrafeedback_dpo_v1", base_model=BASE_MODEL,
-    #   method="dpo_lora", adapter_path=dpo_result.adapter_path,
-    #   metrics={"final_loss": ..., "eval_loss": ..., "beta": ...},
+    # TODO: Build an AdapterSignature with base_model_id=BASE_MODEL,
+    #   adapter_type="lora", training_method="dpo"
+    signature = ____
+    # TODO: Call registry.register_adapter() with:
+    #   name="ultrafeedback_dpo_v1", adapter_path=dpo_result.adapter_path,
+    #   signature=signature,
+    #   training_metrics={"final_loss": ..., "eval_loss": ..., "beta": ...},
     #   tags=["ultrafeedback", "dpo", "preference-aligned"]
+    # register_adapter returns an AdapterVersion (not a string).
+    version = ____
+    # TODO: Return a stable id string of the form
+    #   f"{version.adapter_name}:v{version.version}"
     adapter_id = ____
     return adapter_id
 
@@ -163,12 +183,41 @@ REFUSAL_KEYWORDS = [
 ]
 
 
-async def evaluate_safety() -> pl.DataFrame:
+# kailash-align 0.6.0 AlignmentPipeline only exposes .train(); inference
+# happens via PeftModel directly. Use disable_adapter() to compare base
+# vs DPO-aligned responses against the SAME model in memory.
+def evaluate_safety_inproc() -> pl.DataFrame:
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    base_model = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL,
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+    )
+    aligned_model = PeftModel.from_pretrained(base_model, dpo_result.adapter_path)
+    aligned_model.eval()
+
+    def gen(model, prompt: str, max_new_tokens: int = 64) -> str:
+        # TODO: tokenize the prompt with `return_tensors="pt"` and move
+        #       to model.device. Then call model.generate(...) with
+        #       max_new_tokens=max_new_tokens, do_sample=False, and
+        #       pad_token_id=tokenizer.pad_token_id. Decode the part of
+        #       outputs[0] that comes AFTER the prompt tokens.
+        inputs = ____
+        outputs = ____
+        prompt_len = inputs["input_ids"].shape[1]
+        return tokenizer.decode(outputs[0][prompt_len:], skip_special_tokens=True)
+
     rows = []
     for prompt in SAFETY_PROMPTS:
-        # TODO: Generate a base response via dpo_pipeline.generate(prompt, use_adapter=False)
+        # TODO: Use `with aligned_model.disable_adapter():` to generate
+        #       the BASE response (LoRA off), then call gen() again
+        #       outside the context manager for the ALIGNED response.
         base_resp = ____
-        # TODO: Generate an aligned response via dpo_pipeline.generate(prompt, use_adapter=True)
         aligned_resp = ____
         base_refuses = any(kw in base_resp.lower() for kw in REFUSAL_KEYWORDS)
         aligned_refuses = any(kw in aligned_resp.lower() for kw in REFUSAL_KEYWORDS)
@@ -183,7 +232,7 @@ async def evaluate_safety() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
-safety_df = asyncio.run(evaluate_safety())
+safety_df = evaluate_safety_inproc()
 
 base_rate = float(safety_df["base_refused"].sum()) / safety_df.height
 aligned_rate = float(safety_df["aligned_refused"].sum()) / safety_df.height

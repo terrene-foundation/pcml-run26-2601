@@ -54,11 +54,14 @@ if TYPE_CHECKING:  # pragma: no cover — type-only imports
 setup_environment()
 load_dotenv()
 
-MODEL = os.environ.get("DEFAULT_LLM_MODEL") or os.environ.get("OPENAI_PROD_MODEL")
-if not MODEL:
-    raise EnvironmentError(
-        "Set DEFAULT_LLM_MODEL or OPENAI_PROD_MODEL in .env before running"
-    )
+from shared.mlfp06._ollama_bootstrap import DEFAULT_CHAT_MODEL, OLLAMA_BASE_URL
+
+MODEL = DEFAULT_CHAT_MODEL
+LLM_PROVIDER_DEFAULT = os.environ.get("LLM_PROVIDER", "ollama")
+LLM_BASE_URL_DEFAULT = os.environ.get("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
+
+if not MODEL:  # pragma: no cover — bootstrap default never returns empty
+    raise EnvironmentError("OLLAMA_CHAT_MODEL or DEFAULT_LLM_MODEL must be set")
 
 # Output + cache directories
 OUTPUT_DIR = Path("outputs") / "ex8_capstone"
@@ -144,8 +147,9 @@ class CapstoneQAConfig:
     kaizen 2.7.3. The legacy class-level ``max_llm_cost_usd`` has moved here.
     """
 
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
-    model: str = MODEL or "gpt-4o-mini"
+    llm_provider: str = LLM_PROVIDER_DEFAULT
+    model: str = MODEL
+    base_url: str = LLM_BASE_URL_DEFAULT
     temperature: float = 0.2
     budget_limit_usd: float = 5.0
 
@@ -453,7 +457,7 @@ def build_capstone_stack(
     agents_by_role: dict[str, GovernedSupervisor] = {}
     for tier in CAPSTONE_TIERS:
         agents_by_role[tier.role] = GovernedSupervisor(
-            model=MODEL or "gpt-4o-mini",
+            model=MODEL,
             budget_usd=tier.budget_usd,
             tools=list(tier.tools),
             data_clearance=tier.clearance,

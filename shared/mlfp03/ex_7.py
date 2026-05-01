@@ -188,7 +188,7 @@ async def build_training_registry(db_url: str | None = None):
     Returns ``(registry, connection_manager)``. Caller owns ``connection_manager.close()``.
     """
     from kailash.db import ConnectionManager
-    from kailash_ml.engines.model_registry import ModelRegistry
+    from kailash_ml import ModelRegistry
 
     conn = ConnectionManager(db_url or DB_URL)
     await conn.initialize()

@@ -30,7 +30,7 @@ import asyncio
 
 from kailash.runtime import LocalRuntime
 from kailash.workflow.builder import WorkflowBuilder
-from kailash_ml.engines.training_pipeline import (
+from kailash_ml import (
     EvalSpec,
     ModelSpec,
     TrainingPipeline,

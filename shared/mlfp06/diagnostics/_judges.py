@@ -43,21 +43,29 @@ logger = logging.getLogger(__name__)
 def resolve_judge_model(explicit: str | None = None) -> str:
     """Return the judge model name per ``rules/env-models.md``.
 
-    Resolution order: explicit arg → ``OPENAI_JUDGE_MODEL`` → ``DEFAULT_LLM_MODEL``
-    → ``OPENAI_PROD_MODEL``. Raises if none is set — silent default to a
-    hardcoded model is BLOCKED.
+    Resolution order: explicit arg → ``OLLAMA_JUDGE_MODEL`` →
+    ``OLLAMA_CHAT_MODEL`` → bootstrap default. The previous OpenAI fall-throughs
+    (``OPENAI_JUDGE_MODEL`` / ``OPENAI_PROD_MODEL``) are honoured if set so
+    legacy ``.env`` files still resolve, but the bootstrap default is the
+    primary path.
     """
     load_dotenv()
     if explicit:
         return explicit
-    for key in ("OPENAI_JUDGE_MODEL", "DEFAULT_LLM_MODEL", "OPENAI_PROD_MODEL"):
+    for key in (
+        "OLLAMA_JUDGE_MODEL",
+        "OLLAMA_CHAT_MODEL",
+        "OPENAI_JUDGE_MODEL",
+        "DEFAULT_LLM_MODEL",
+        "OPENAI_PROD_MODEL",
+    ):
         val = os.environ.get(key)
         if val:
             return val
-    raise EnvironmentError(
-        "No judge model configured. Set OPENAI_JUDGE_MODEL, DEFAULT_LLM_MODEL, "
-        "or OPENAI_PROD_MODEL in .env."
-    )
+    # Final fallback: the M6 bootstrap chat default.
+    from shared.mlfp06._ollama_bootstrap import DEFAULT_CHAT_MODEL
+
+    return DEFAULT_CHAT_MODEL
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -206,17 +214,17 @@ class JudgeCallable:
     def _ensure_delegate(self) -> Any:
         if self._delegate is not None:
             return self._delegate
-        # Lazy import — Delegate is not needed at module import time.
-        from kaizen_agents import Delegate
+        # Lazy import — bootstrap is not needed at module import time.
+        from shared.mlfp06._ollama_bootstrap import make_delegate
 
-        self._delegate = Delegate(
+        self._delegate = make_delegate(
             model=self._model_name,
             system_prompt=self._JUDGE_SYSTEM,
             temperature=0.0,
         )
         logger.info(
             "judge.delegate_constructed",
-            extra={"judge_model": self._model_name},
+            extra={"judge_model": self._model_name, "provider": "ollama"},
         )
         return self._delegate
 

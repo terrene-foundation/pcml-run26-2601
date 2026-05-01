@@ -34,7 +34,7 @@ from shared.mlfp06.ex_1 import (
     compute_metrics,
     get_eval_docs,
     normalise_label,
-    plot_cost_vs_accuracy,
+    plot_tokens_vs_accuracy,
     plot_vote_agreement,
     print_summary,
     run_delegate,
@@ -85,23 +85,23 @@ End with your final classification as exactly "positive" or "negative".
 Review: "{text[:800]}"
 
 Step-by-step reasoning:"""
-    response, cost, elapsed = await run_delegate(prompt)
-    return normalise_label(response), cost, elapsed
+    response, tokens, elapsed = await run_delegate(prompt)
+    return normalise_label(response), tokens, elapsed
 
 
 async def self_consistency_classify(text: str) -> tuple[str, list[str], float, float]:
-    """Sample N_SAMPLES CoT paths, return (majority_label, votes, total_cost, total_elapsed).
+    """Sample N_SAMPLES CoT paths, return (majority_label, votes, total_tokens, total_elapsed).
 
     Samples run in parallel via asyncio.gather to avoid N x latency.
     """
     tasks = [cot_once(text) for _ in range(N_SAMPLES)]
     results = await asyncio.gather(*tasks)
     votes = [r[0] for r in results]
-    total_cost = sum(r[1] for r in results)
+    total_tokens = sum(r[1] for r in results)
     # Parallel max latency, not sum — gather runs concurrently
     max_elapsed = max(r[2] for r in results)
     majority = Counter(votes).most_common(1)[0][0]
-    return majority, votes, total_cost, max_elapsed
+    return majority, votes, total_tokens, max_elapsed
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -115,7 +115,7 @@ async def evaluate() -> list[dict]:
     for i, (text, true_label) in enumerate(
         zip(docs["text"].to_list(), docs["label"].to_list())
     ):
-        pred, votes, cost, elapsed = await self_consistency_classify(text)
+        pred, votes, tokens, elapsed = await self_consistency_classify(text)
         correct = pred == true_label
         results.append(
             {
@@ -123,7 +123,7 @@ async def evaluate() -> list[dict]:
                 "pred": pred,
                 "true": true_label,
                 "correct": correct,
-                "cost": cost,
+                "tokens": tokens,
                 "elapsed": elapsed,
                 "votes": votes,
             }
@@ -180,26 +180,26 @@ plot_vote_agreement(
 zero_shot_expected = {
     "strategy": "Zero-Shot",
     "accuracy": 0.80,
-    "total_cost": 0.002,
+    "total_tokens": 1500,
     "avg_latency_s": 1.0,
     "n": 20,
 }
 few_shot_expected = {
     "strategy": "Few-Shot",
     "accuracy": 0.85,
-    "total_cost": 0.006,
+    "total_tokens": 5400,
     "avg_latency_s": 1.2,
     "n": 20,
 }
 cot_expected = {
     "strategy": "CoT",
     "accuracy": 0.90,
-    "total_cost": 0.015,
+    "total_tokens": 10500,
     "avg_latency_s": 3.5,
     "n": 20,
 }
 sc_metrics = compute_metrics(sc_results, f"SC (N={N_SAMPLES})")
-plot_cost_vs_accuracy(
+plot_tokens_vs_accuracy(
     [zero_shot_expected, few_shot_expected, cot_expected, sc_metrics],
     title="Cost vs Accuracy — Self-Consistency on the Pareto Frontier",
     filename="ex1_05_cost_vs_accuracy.png",

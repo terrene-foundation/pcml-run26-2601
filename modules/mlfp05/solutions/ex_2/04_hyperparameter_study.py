@@ -241,10 +241,8 @@ async def train_lr_sweep_async(lr: float) -> tuple[list[float], list[float]]:
         enable_checkpointing=False,
     )
 
-    async with tracker.run(
-        experiment_name=exp_name, run_name=f"hp_sweep_lr_{lr}"
-    ) as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name=f"hp_sweep_lr_{lr}") as run:
+        await run.log_params(
             {
                 "architecture": "ResNetSE",
                 "lr": str(lr),
@@ -257,11 +255,11 @@ async def train_lr_sweep_async(lr: float) -> tuple[list[float], list[float]]:
         trainer.fit(lit, train_loader, val_loader)
 
         for epoch_idx, loss in enumerate(lit.train_losses):
-            await ctx.log_metric("train_loss", loss, step=epoch_idx + 1)
+            await run.log_metric("train_loss", loss, step=epoch_idx + 1)
         for epoch_idx, acc in enumerate(lit.val_accs):
-            await ctx.log_metric("val_accuracy", acc, step=epoch_idx + 1)
+            await run.log_metric("val_accuracy", acc, step=epoch_idx + 1)
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {
                 "final_train_loss": lit.train_losses[-1],
                 "final_val_accuracy": lit.val_accs[-1],
@@ -427,18 +425,10 @@ for aug_name, loader in [("no_augmentation", noaug_loader), ("flip_crop", aug_lo
     # Quick diagnostic check per HP configuration — surfaces whether
     # a high-loss config is hurting the network's CLINICAL HEALTH
     # (dead neurons, vanishing gradients) or merely its accuracy.
-    from shared.mlfp05.diagnostics import diagnose_classifier
+    from kailash_ml import diagnose
 
     print(f"  ── Diagnostic Report ({aug_name}) ──")
-    _diag, _findings = diagnose_classifier(
-        model,
-        val_loader,
-        title=f"ResNetSE {aug_name}",
-        n_batches=4,  # brief sweep — full report on winning model
-        train_losses=losses,
-        val_losses=[1.0 - a for a in accs],
-        show=False,
-    )
+    report = diagnose(model, kind="dl", data=val_loader, show=False)
     # ══════ EXPECTED OUTPUT (synthesized reference across HP configs) ══════
     # Typical Prescription-Pad patterns observed per augmentation config:
     # ┌──────────────────────────┬──────────────────────────────────────────┐
@@ -820,6 +810,32 @@ print(f"\n  All runs are queryable via ExperimentTracker for future comparison."
 # Clean up
 # ════════════════════════════════════════════════════════════════════════
 asyncio.run(conn.close())
+
+
+# ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson walked the journey of CNN hyperparameter tuning — learning
+# rate sweeps, augmentation studies, per-config diagnose_classifier
+# reports. The kailash-ml SDK ships a single-call diagnostic primitive
+# that closes the production loop: km.diagnose inspects a trained model
+# and emits an auto-dashboard (loss curves, gradient flow, dead neurons,
+# activation stats, weight distributions). One cell. Every diagnostic
+# students would otherwise hand-roll, ready to surface in a Plotly
+# dashboard.
+
+from kailash_ml import diagnose
+
+# The flip_crop run was the winning HP configuration. `kind='auto'`
+# dispatches by model type — DLDiagnostics for torch.nn.Module.
+# `data=` accepts any iterable yielding tensors; we reuse val_loader.
+winning_model = aug_results["flip_crop"]["model"]
+report = diagnose(winning_model, kind="auto", data=val_loader, show=False)
+report.plot_training_dashboard()
+print()
+print("km.diagnose: 1 line of code -> the same observability the lesson")
+print("body hand-rolled in 200+ lines. This is what 'destination-first'")
+print("means — when the journey is internalised, the SDK is one call.")
 
 
 # ════════════════════════════════════════════════════════════════════════

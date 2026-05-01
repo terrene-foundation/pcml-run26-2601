@@ -137,7 +137,7 @@ conv_losses = train_variant(
 # RMS per Conv2d kernel; the X-ray monitors per-channel dead
 # fractions. Healthy Conv nets typically have far FEWER dead
 # channels than dense nets at equal depth thanks to weight sharing.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

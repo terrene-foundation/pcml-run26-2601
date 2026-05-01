@@ -25,8 +25,7 @@ import polars as pl
 from dotenv import load_dotenv
 
 from kailash.db import ConnectionManager
-from kailash_ml import DataExplorer
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
+from kailash_ml import DataExplorer, ExperimentTracker
 
 from shared.data_loader import MLFPDataLoader
 from shared.kailash_helpers import setup_environment
@@ -402,19 +401,16 @@ def prepare_selection_inputs(
 
 
 async def setup_tracking() -> tuple[ConnectionManager, ExperimentTracker, str]:
-    """Initialize ConnectionManager + ExperimentTracker and create the M3
-    experiment. Every technique file in ex_1 logs into the same experiment
-    so selection runs are directly comparable.
+    """Initialize ConnectionManager + ExperimentTracker (kailash-ml 1.1.1).
+
+    Every technique file in ex_1 logs into the same experiment so selection
+    runs are directly comparable. The tracker is constructed via the async
+    factory; the experiment is auto-created on first ``tracker.track(...)``.
     """
+    tracker = await ExperimentTracker.create(store_url=EXPERIMENT_DB)
     conn = ConnectionManager(EXPERIMENT_DB)
     await conn.initialize()
-    tracker = ExperimentTracker(conn)
-    experiment_id = await tracker.create_experiment(
-        name=EXPERIMENT_NAME,
-        description="Feature engineering experiments on ICU data — Module 3",
-        tags=["mlfp03", "healthcare", "feature-engineering"],
-    )
-    return conn, tracker, experiment_id
+    return conn, tracker, EXPERIMENT_NAME
 
 
 def setup_tracking_sync() -> tuple[ConnectionManager, ExperimentTracker, str]:
@@ -449,12 +445,12 @@ async def log_selection_run(
     if extra_metrics:
         metrics.update(extra_metrics)
 
-    async with tracker.run(experiment_id, run_name=run_name) as run:
+    async with tracker.track(experiment=experiment_id, run_name=run_name) as run:
         await run.log_params(params)
         await run.log_metrics(metrics)
-        await run.set_tag("domain", "clinical")
-        await run.set_tag("selection_family", method)
-        run_id = getattr(run, "id", run_name)
+        await run.add_tag("domain", "clinical")
+        await run.add_tag("selection_family", method)
+        run_id = run.run_id
     return run_id
 
 

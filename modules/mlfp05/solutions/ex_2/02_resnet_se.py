@@ -290,18 +290,10 @@ resnet_losses, resnet_accs = train_model(
 # the PROVEN fix for vanishing gradients (compare to ex_1/07's
 # 5-layer stacked AE). Expect near-uniform gradient RMS across
 # depth — that is the whole point of skip connections.
-from shared.mlfp05.diagnostics import diagnose_classifier
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (ResNetSE) ──")
-diag, findings = diagnose_classifier(
-    resnet_se,
-    val_loader,
-    title="ResNetSE (CIFAR-10)",
-    n_batches=8,
-    train_losses=resnet_losses,
-    val_losses=[1.0 - a for a in resnet_accs],
-    show=False,
-)
+report = diagnose(resnet_se, kind="dl", data=val_loader, show=False)
 # ══════ EXPECTED OUTPUT (synthesized reference — full run produces similar pattern) ══════
 # ════════════════════════════════════════════════════════════════
 #   DL Diagnostics Report — Prescription Pad

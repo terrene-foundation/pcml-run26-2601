@@ -59,7 +59,7 @@ FEW_SHOT_EXAMPLES = ____
 
 
 async def few_shot_classify(text: str) -> tuple[str, float, float]:
-    """Classify sentiment with 4 curated examples. Returns (label, cost, elapsed)."""
+    """Classify sentiment with 4 curated examples. Returns (label, tokens, elapsed)."""
     # TODO: Build an examples_text string by joining each example as:
     #   Review: "<text>"
     #   Sentiment: <category>

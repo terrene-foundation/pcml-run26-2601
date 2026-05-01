@@ -26,11 +26,8 @@ import pytorch_lightning as pl
 import torchvision
 
 from kailash.db import ConnectionManager
-from kailash_ml import ModelVisualizer
-from kailash_ml.bridge.onnx_bridge import OnnxBridge
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
-from kailash_ml.engines.inference_server import InferenceServer
-from kailash_ml.engines.model_registry import ModelRegistry
+from kailash_ml import ExperimentTracker, ModelVisualizer
+from kailash_ml import ModelRegistry
 from kailash_ml.types import MetricSpec
 from shared.kailash_helpers import get_device, setup_environment
 
@@ -41,9 +38,16 @@ np.random.seed(42)
 pl.seed_everything(42, workers=True)
 
 DEVICE = get_device()
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# Notebook-safe path resolution: __file__ is undefined when this module is
+# inlined into a Colab notebook by scripts/generate_selfcontained_notebook.py.
+try:
+    _HERE = Path(__file__).resolve()
+    REPO_ROOT = _HERE.parents[2]
+    ARTIFACT_DIR = _HERE.parent
+except NameError:
+    REPO_ROOT = Path.cwd()
+    ARTIFACT_DIR = Path.cwd()
 DATA_DIR = REPO_ROOT / "data" / "mlfp05" / "cifar10"
-ARTIFACT_DIR = Path(__file__).resolve().parent
 
 N_CLASSES = 10
 BATCH_SIZE = 128
@@ -136,29 +140,26 @@ async def setup_engines(db_name: str = "mlfp05_cnns.db") -> tuple[
     ModelRegistry | None,
     bool,
 ]:
-    """Initialise ExperimentTracker and ModelRegistry.
+    """Initialise ExperimentTracker (kailash-ml 1.1.1 factory) and ModelRegistry.
 
     Returns:
-        conn, tracker, experiment_name, registry (or None), has_registry
+        conn, tracker, experiment_name, registry, has_registry
     """
-    conn = ConnectionManager(f"sqlite:///{db_name}")
-    await conn.initialize()
-
-    tracker = ExperimentTracker(conn)
-    exp_name = await tracker.create_experiment(
-        name="m5_cnns",
-        description="CNN architectures on full CIFAR-10 (50K images)",
+    # Schema-conflict workaround (kailash-ml 1.5.x): ExperimentTracker and
+    # ModelRegistry use incompatible _kml_model_versions schemas. Route them
+    # to separate sqlite files until upstream fixes the conflict.
+    db = f"sqlite:///{db_name}"
+    registry_db_name = (
+        db_name.replace(".db", "_registry.db")
+        if db_name.endswith(".db")
+        else db_name + "_registry.db"
     )
-
-    try:
-        registry = ModelRegistry(conn)
-        has_registry = True
-    except Exception as e:
-        registry = None
-        has_registry = False
-        print(f"  Note: ModelRegistry setup skipped ({e})")
-
-    return conn, tracker, exp_name, registry, has_registry
+    registry_db = f"sqlite:///{registry_db_name}"
+    tracker = await ExperimentTracker.create(store_url=db)
+    conn = ConnectionManager(registry_db)
+    await conn.initialize()
+    registry = ModelRegistry(conn)
+    return conn, tracker, "m5_cnns", registry, True
 
 
 def init_engines(db_name: str = "mlfp05_cnns.db") -> tuple[
@@ -193,6 +194,7 @@ class LitCNN(pl.LightningModule):
         self._val_total = 0
 
     def training_step(self, batch, batch_idx):
+        del batch_idx  # Lightning protocol arg; not used here
         x, y = batch
         logits = self.model(x)
         loss = F.cross_entropy(logits, y)
@@ -205,6 +207,7 @@ class LitCNN(pl.LightningModule):
             self._batch_losses = []
 
     def validation_step(self, batch, batch_idx):
+        del batch_idx  # Lightning protocol arg; not used here
         x, y = batch
         logits = self.model(x)
         self._val_correct += int((logits.argmax(dim=-1) == y).sum().item())
@@ -221,27 +224,25 @@ class LitCNN(pl.LightningModule):
 
 
 def get_precision_setting() -> str:
-    """Detect whether mixed-precision training is beneficial."""
-    if torch.cuda.is_available():
-        cap = torch.cuda.get_device_capability()
-        if cap[0] >= 7:
-            print("  GPU with Tensor Cores detected -- using 16-mixed precision")
-            return "16-mixed"
-        print("  Older GPU detected -- using 32-bit precision")
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        print("  Apple MPS detected -- using 32-bit precision (no fp16 compute units)")
-    else:
-        print("  CPU detected -- using 32-bit precision")
-    return "32"
+    """Return the optimal Lightning precision string for the current backend.
+
+    Routes through ``kailash_ml.device()`` so MPS / CUDA / ROCm / Intel XPU /
+    CPU are all selected by the same policy the rest of the platform uses.
+    BackendInfo.precision is the canonical answer ("16-mixed" on Apple MPS
+    + Tensor-Core GPUs, "32" on older GPUs and CPU).
+    """
+    import kailash_ml as km
+
+    backend = km.device()
+    print(f"  {backend.backend} detected -- using {backend.precision} precision")
+    return backend.precision
 
 
 def get_accelerator() -> str:
-    """Return the Lightning accelerator string for the current device."""
-    if torch.cuda.is_available():
-        return "gpu"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
+    """Return the Lightning accelerator string for the current backend."""
+    import kailash_ml as km
+
+    return km.device().accelerator
 
 
 PRECISION = get_precision_setting()
@@ -260,8 +261,8 @@ async def train_model_async(
 ) -> tuple[list[float], list[float]]:
     """Train a CNN with Lightning and log metrics to ExperimentTracker.
 
-    Uses the ``tracker.run(...)`` async context manager. On normal exit
-    the run is marked COMPLETED; on exception it is marked FAILED.
+    Uses the kailash-ml 1.1.1 ``tracker.track(...)`` async context manager.
+    On normal exit the run is marked FINISHED; on exception it is marked FAILED.
     """
     lit = LitCNN(model, lr=lr)
     trainer = pl.Trainer(
@@ -274,8 +275,8 @@ async def train_model_async(
         enable_checkpointing=False,
     )
 
-    async with tracker.run(experiment_name=exp_name, run_name=name) as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name=name) as run:
+        await run.log_params(
             {
                 "architecture": name,
                 "lr": str(lr),
@@ -290,11 +291,11 @@ async def train_model_async(
         trainer.fit(lit, train_loader, val_loader)
 
         for epoch_idx, loss in enumerate(lit.train_losses):
-            await ctx.log_metric("train_loss", loss, step=epoch_idx + 1)
+            await run.log_metric("train_loss", loss, step=epoch_idx + 1)
         for epoch_idx, acc in enumerate(lit.val_accs):
-            await ctx.log_metric("val_accuracy", acc, step=epoch_idx + 1)
+            await run.log_metric("val_accuracy", acc, step=epoch_idx + 1)
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {
                 "final_train_loss": lit.train_losses[-1],
                 "final_val_accuracy": lit.val_accs[-1],

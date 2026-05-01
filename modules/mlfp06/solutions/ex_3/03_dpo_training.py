@@ -31,7 +31,16 @@ from __future__ import annotations
 import asyncio
 
 import polars as pl
-from kailash_align import AdapterRegistry, AlignmentConfig, AlignmentPipeline
+from kailash_align import (
+    AdapterRegistry,
+    AdapterSignature,
+    AlignmentConfig,
+    AlignmentPipeline,
+    AlignmentResult,
+    DPOConfig,
+    LoRAConfig,
+    SFTConfig,
+)
 
 from shared.mlfp06.ex_3 import (
     ADAPTER_OUTPUT_DIR,
@@ -62,35 +71,46 @@ print("=" * 70)
 print("TASK 1: Build DPO AlignmentConfig")
 print("=" * 70)
 
+# kailash-align 0.6.0+ uses a composed AlignmentConfig: top-level
+# method + base_model_id + experiment_dir, plus LoRAConfig + SFTConfig
+# + DPOConfig sub-configs. Here we set DPO + LoRA hyperparameters; the
+# SFTConfig is unused for method="dpo" but the constructor still requires
+# it (default values are fine).
 dpo_config = AlignmentConfig(
     method="dpo",
-    base_model=BASE_MODEL,
-    dataset_format="preference",
-    beta=0.1,
-    lora_r=16,
-    lora_alpha=32,
-    lora_dropout=0.05,
-    target_modules=["q_proj", "v_proj"],
-    num_epochs=2,
-    batch_size=2,
-    learning_rate=5e-5,
-    warmup_ratio=0.1,
-    max_seq_length=512,
-    gradient_accumulation_steps=4,
-    output_dir=str(ADAPTER_OUTPUT_DIR),
+    base_model_id=BASE_MODEL,
+    lora=LoRAConfig(
+        rank=16,
+        alpha=32,
+        target_modules=("q_proj", "v_proj"),
+        dropout=0.05,
+    ),
+    sft=SFTConfig(),
+    dpo=DPOConfig(
+        num_train_epochs=2,
+        per_device_train_batch_size=2,
+        gradient_accumulation_steps=4,
+        learning_rate=5e-5,
+        warmup_ratio=0.1,
+        max_length=512,
+        beta=0.1,
+    ),
+    experiment_dir=str(ADAPTER_OUTPUT_DIR),
 )
 
 print(f"  Method:    {dpo_config.method}")
-print(f"  Beta:      {dpo_config.beta}")
-print(f"  Base:      {dpo_config.base_model}")
-print(f"  Format:    {dpo_config.dataset_format}")
-print(f"  LoRA:      r={dpo_config.lora_r}, alpha={dpo_config.lora_alpha}")
-print(f"  Training:  {dpo_config.num_epochs} epochs, lr={dpo_config.learning_rate}")
+print(f"  Beta:      {dpo_config.dpo.beta}")
+print(f"  Base:      {dpo_config.base_model_id}")
+print(f"  LoRA:      r={dpo_config.lora.rank}, alpha={dpo_config.lora.alpha}")
+print(
+    f"  Training:  {dpo_config.dpo.num_train_epochs} epochs, "
+    f"lr={dpo_config.dpo.learning_rate}"
+)
 
 # ── Checkpoint 1 ─────────────────────────────────────────────────────────
 assert dpo_config.method == "dpo"
-assert dpo_config.dataset_format == "preference"
-assert dpo_config.beta == 0.1
+assert dpo_config.dpo.beta == 0.1
+assert dpo_config.lora.rank == 16
 print("✓ Checkpoint 1 passed — DPO config ready\n")
 
 
@@ -107,13 +127,16 @@ train_pref, eval_pref = split_preferences(pref_data, train_frac=0.9)
 print(f"Train: {train_pref.height} pairs | Eval: {eval_pref.height} pairs")
 
 
-async def run_dpo_training() -> tuple[AlignmentPipeline, object]:
+async def run_dpo_training() -> tuple[AlignmentPipeline, AlignmentResult]:
     pipeline = AlignmentPipeline(dpo_config)
     print("\nRunning DPO training (this is the slow bit)...")
     result = await pipeline.train(train_data=train_pref, eval_data=eval_pref)
-    print(f"  Final loss: {result.final_loss:.4f}")
-    print(f"  Eval loss:  {result.eval_loss:.4f}")
-    print(f"  Time:       {result.training_time_seconds:.0f}s")
+    # AlignmentResult.training_metrics is a dict — final_loss / eval_loss /
+    # training_time_seconds live there, not as direct attributes (kailash-align 0.6.0).
+    metrics = result.training_metrics
+    print(f"  Final loss: {metrics['final_loss']:.4f}")
+    print(f"  Eval loss:  {metrics['eval_loss']:.4f}")
+    print(f"  Time:       {metrics.get('training_time_seconds', 0):.0f}s")
     print(f"  Adapter:    {result.adapter_path}")
     return pipeline, result
 
@@ -122,8 +145,11 @@ dpo_pipeline, dpo_result = asyncio.run(run_dpo_training())
 
 # ── Checkpoint 2 ─────────────────────────────────────────────────────────
 assert dpo_result is not None
-assert dpo_result.final_loss > 0
-print(f"✓ Checkpoint 2 passed — DPO final loss={dpo_result.final_loss:.4f}\n")
+assert dpo_result.training_metrics["final_loss"] > 0
+print(
+    f"✓ Checkpoint 2 passed — DPO final loss="
+    f"{dpo_result.training_metrics['final_loss']:.4f}\n"
+)
 
 # INTERPRETATION: Unlike SFT, DPO loss can trend negative — it measures
 # how confident the policy is about preference ordering, not absolute
@@ -141,19 +167,27 @@ print("=" * 70)
 
 async def register_adapter() -> str:
     registry = AdapterRegistry()
-    adapter_id = await registry.register(
+    # AdapterSignature bundles base_model_id + adapter_type + training_method
+    # (kailash-align 0.6.0+; replaces the old base_model + method args).
+    signature = AdapterSignature(
+        base_model_id=BASE_MODEL,
+        adapter_type="lora",
+        training_method="dpo",
+    )
+    version = await registry.register_adapter(
         name="ultrafeedback_dpo_v1",
-        base_model=BASE_MODEL,
-        method="dpo_lora",
         adapter_path=dpo_result.adapter_path,
-        metrics={
-            "final_loss": dpo_result.final_loss,
-            "eval_loss": dpo_result.eval_loss,
-            "beta": dpo_config.beta,
+        signature=signature,
+        training_metrics={
+            "final_loss": dpo_result.training_metrics["final_loss"],
+            "eval_loss": dpo_result.training_metrics["eval_loss"],
+            "beta": dpo_config.dpo.beta,
         },
         tags=["ultrafeedback", "dpo", "preference-aligned"],
     )
-    return adapter_id
+    # register_adapter returns an AdapterVersion dataclass; downstream
+    # callers want a single human-readable string they can log + look up.
+    return f"{version.adapter_name}:v{version.version}"
 
 
 adapter_id = asyncio.run(register_adapter())
@@ -194,12 +228,48 @@ REFUSAL_KEYWORDS = [
 ]
 
 
-async def evaluate_safety() -> pl.DataFrame:
+# kailash-align 0.6.0 AlignmentPipeline only exposes .train(); inference
+# happens via either KaizenModelBridge (Ollama/vLLM deployment, production
+# path) OR direct PeftModel.disable_adapter() context manager (in-process,
+# teaching path). We use the in-process path here: load the trained
+# adapter once, toggle it on/off via the PEFT context manager, and
+# generate base + aligned responses against the same model.
+def evaluate_safety_inproc() -> pl.DataFrame:
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    print("Loading base + DPO-aligned models for inline generation...")
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    base_model = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL,
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+    )
+    aligned_model = PeftModel.from_pretrained(base_model, dpo_result.adapter_path)
+    aligned_model.eval()
+
+    def gen(model, prompt: str, max_new_tokens: int = 64) -> str:
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=tokenizer.pad_token_id,
+            )
+        prompt_len = inputs["input_ids"].shape[1]
+        return tokenizer.decode(outputs[0][prompt_len:], skip_special_tokens=True)
+
     print("Generating responses from base and aligned policies...")
     rows = []
     for prompt in SAFETY_PROMPTS:
-        base_resp = await dpo_pipeline.generate(prompt, use_adapter=False)
-        aligned_resp = await dpo_pipeline.generate(prompt, use_adapter=True)
+        # disable_adapter() exposes the unmodified base model; default
+        # state runs the DPO-trained LoRA on top.
+        with aligned_model.disable_adapter():
+            base_resp = gen(aligned_model, prompt)
+        aligned_resp = gen(aligned_model, prompt)
 
         base_refuses = any(kw in base_resp.lower() for kw in REFUSAL_KEYWORDS)
         aligned_refuses = any(kw in aligned_resp.lower() for kw in REFUSAL_KEYWORDS)
@@ -221,7 +291,7 @@ async def evaluate_safety() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
-safety_df = asyncio.run(evaluate_safety())
+safety_df = evaluate_safety_inproc()
 
 base_rate = float(safety_df["base_refused"].sum()) / safety_df.height
 aligned_rate = float(safety_df["aligned_refused"].sum()) / safety_df.height

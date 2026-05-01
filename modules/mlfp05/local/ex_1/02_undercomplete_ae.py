@@ -488,7 +488,7 @@ print(
 # gradients should be healthier across the encoder *while* the
 # train loss stays noticeably higher than the overcomplete AE —
 # that higher loss is the SIGNAL of genuine compression learning.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

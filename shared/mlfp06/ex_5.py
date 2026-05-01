@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import inspect
 import json
-import os
 from pathlib import Path
 
 import polars as pl
@@ -30,12 +29,9 @@ from shared.kailash_helpers import setup_environment
 
 setup_environment()
 
-MODEL = os.environ.get("DEFAULT_LLM_MODEL", os.environ.get("OPENAI_PROD_MODEL"))
-if not MODEL:
-    raise EnvironmentError(
-        "Set DEFAULT_LLM_MODEL or OPENAI_PROD_MODEL in .env before running "
-        "MLFP06 Exercise 5 — agents require an LLM model."
-    )
+from shared.mlfp06._ollama_bootstrap import DEFAULT_CHAT_MODEL
+
+MODEL = DEFAULT_CHAT_MODEL
 
 OUTPUT_DIR = Path("outputs") / "ex5_agents"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

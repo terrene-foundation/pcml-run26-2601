@@ -37,7 +37,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from kailash_ml import ModelVisualizer
-from kailash_ml.engines.model_registry import ModelRegistry
+from kailash_ml import ModelRegistry
 from kailash_ml.types import MetricSpec
 
 from shared.mlfp05.ex_1 import (
@@ -438,6 +438,31 @@ assert grand_path.exists(), "Grand comparison image should be saved"
 print("\n--- Final checkpoint passed --- grand comparison complete\n")
 
 asyncio.run(conn.close())
+
+
+# ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson walked the journey of the autoencoder family — 10 variants,
+# 10 hand-rolled training loops, 10 reconstruction grids. The kailash-ml
+# SDK ships a single-call diagnostic primitive that closes the production
+# loop: km.diagnose inspects a trained model and emits an auto-dashboard
+# (loss curves, gradient flow, dead neurons, activation stats, weight
+# distributions). One cell. Every diagnostic students would otherwise
+# hand-roll, ready to surface in a Plotly dashboard.
+
+from kailash_ml import diagnose
+
+# Pick the VAE (the lesson's most expressive variant) for the close.
+# `kind='auto'` dispatches by model type — DLDiagnostics for torch.nn.Module.
+# `data=` accepts any iterable yielding tensors; we reuse the flat_loader
+# the lesson already constructed.
+report = diagnose(all_models["vae"], kind="auto", data=flat_loader, show=False)
+report.plot_training_dashboard()
+print()
+print("km.diagnose: 1 line of code -> the same observability the lesson")
+print("body hand-rolled in 200+ lines. This is what 'destination-first'")
+print("means — when the journey is internalised, the SDK is one call.")
 
 
 # ════════════════════════════════════════════════════════════════════════

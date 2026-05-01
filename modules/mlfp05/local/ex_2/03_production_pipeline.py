@@ -60,8 +60,8 @@ from shared.mlfp05.ex_2 import (
     register_model,
     train_model,
 )
-from kailash_ml.bridge.onnx_bridge import OnnxBridge
-from kailash_ml.engines.inference_server import InferenceServer
+from kailash_ml import OnnxBridge
+from kailash_ml import InferenceServer
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -737,7 +737,7 @@ print(
 # Running diagnostics BEFORE ONNX export is deployment hygiene: you
 # never want to ship a model that is secretly pathological. A clean
 # Prescription Pad is table stakes for production release.
-from shared.mlfp05.diagnostics import diagnose_classifier
+from kailash_ml.diagnostics import diagnose_classifier
 
 print("\n── Pre-Export Diagnostic Report (ResNetSE) ──")
 diag, findings = diagnose_classifier(

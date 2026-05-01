@@ -29,8 +29,10 @@ torch.manual_seed(42)
 np.random.seed(42)
 device = get_device()
 
-MODEL_NAME = os.environ.get("DEFAULT_LLM_MODEL", os.environ.get("OPENAI_PROD_MODEL"))
-BASE_MODEL = os.environ.get("SFT_BASE_MODEL", "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+from shared.mlfp06._ollama_bootstrap import DEFAULT_CHAT_MODEL
+
+MODEL_NAME = DEFAULT_CHAT_MODEL
+BASE_MODEL = os.environ.get("SFT_BASE_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
 
 # Output directories
 OUTPUT_DIR = Path("outputs") / "ex3_dpo"

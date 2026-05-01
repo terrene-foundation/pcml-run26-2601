@@ -138,7 +138,7 @@ standard_losses = train_variant(
 # We run the diagnostic AFTER training with `run_diagnostic_checkpoint`:
 # the helper attaches hooks, replays 8 batches (no weight updates), and
 # calls `report()` to print the Prescription Pad.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 
 
 def _diag_loss(m, batch):

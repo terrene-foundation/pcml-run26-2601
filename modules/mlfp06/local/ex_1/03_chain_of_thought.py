@@ -64,10 +64,10 @@ async def cot_classify(text: str) -> tuple[str, str, float, float]:
     prompt = ____
 
     # TODO: run_delegate(prompt)
-    response, cost, elapsed = ____
+    response, tokens, elapsed = ____
 
     # TODO: The reasoning is the stripped response. normalise_label extracts
-    # the final label from the last line. Return (label, reasoning, cost, elapsed).
+    # the final label from the last line. Return (label, reasoning, tokens, elapsed).
     ____
 
 
@@ -80,7 +80,7 @@ async def evaluate() -> list[dict]:
     docs = get_eval_docs()
     results: list[dict] = []
     # TODO: Loop over docs, call cot_classify, record a dict with keys:
-    # text, pred, true, correct, cost, elapsed, reasoning. Print reasoning
+    # text, pred, true, correct, tokens, elapsed, reasoning. Print reasoning
     # excerpt (first 180 chars) for the first 3 docs.
     ____
     return results

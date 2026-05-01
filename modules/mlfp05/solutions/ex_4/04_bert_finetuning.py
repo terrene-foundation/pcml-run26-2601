@@ -212,8 +212,8 @@ async def train_bert_async(
     val_accs: list[float] = []
     best_acc = 0.0
 
-    async with tracker.run(experiment_name=exp_name, run_name="bert_finetune") as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name="bert_finetune") as run:
+        await run.log_params(
             {
                 "model_type": "bert_finetune",
                 "base_model": BERT_MODEL_NAME,
@@ -257,7 +257,7 @@ async def train_bert_async(
                 acc = correct / total_count
                 val_accs.append(acc)
 
-            await ctx.log_metrics(
+            await run.log_metrics(
                 {"train_loss": epoch_loss, "val_accuracy": acc}, step=epoch + 1
             )
             if acc > best_acc:
@@ -267,7 +267,7 @@ async def train_bert_async(
                 f"loss={epoch_loss:.4f}  val_acc={acc:.3f}"
             )
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {
                 "best_val_accuracy": best_acc,
                 "final_train_loss": train_losses[-1],
@@ -287,7 +287,7 @@ bert_losses, bert_accs = asyncio.run(
 # ══════════════════════════════════════════════════════════════════
 # BERT batches are dicts of (ids, mask, labels) not (x, y) tuples,
 # so we use run_diagnostic_checkpoint directly with a batch_adapter.
-from shared.mlfp05.diagnostics import run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
 import torch.nn.functional as _F
 
 

@@ -375,55 +375,14 @@ class RAGDiagnostics:
             )
         return pl.DataFrame(scores)
 
-    def trulens_scores(
-        self,
-        queries: Sequence[str],
-        retrieved_contexts: Sequence[Sequence[str]],
-        answers: Sequence[str],
-    ) -> pl.DataFrame:
-        """Run trulens-eval groundedness + relevance (requires ``trulens-eval``)."""
-        try:
-            # trulens-eval 1.x exposes the feedback functions through
-            # ``trulens.core`` / ``trulens.providers``. We probe both modern
-            # and 0.x import paths so either resolves to the same metric.
-            try:
-                from trulens.core import Feedback  # type: ignore[import-not-found]
-                from trulens.providers.openai import OpenAI as TruOpenAI  # type: ignore[import-not-found]
-            except ImportError:  # pragma: no cover — legacy 0.x path
-                from trulens_eval import Feedback  # type: ignore[import-not-found]
-                from trulens_eval.feedback.provider.openai import (  # type: ignore[import-not-found]
-                    OpenAI as TruOpenAI,
-                )
-        except ImportError as exc:
-            raise ImportError(
-                "trulens_scores() requires trulens-eval. Install with "
-                "`pip install trulens-eval>=1.0`."
-            ) from exc
-        provider = TruOpenAI()
-        groundedness = Feedback(provider.groundedness_measure_with_cot_reasons)
-        relevance = Feedback(provider.relevance)
-        rows: list[dict[str, Any]] = []
-        for i, (q, ctxs, a) in enumerate(zip(queries, retrieved_contexts, answers)):
-            joined = "\n\n".join(ctxs)
-            try:
-                g_raw = groundedness(joined, a)
-                g = float(g_raw[0] if isinstance(g_raw, tuple) else g_raw)
-            except Exception as exc:  # pragma: no cover — defensive
-                logger.warning(
-                    "rag.trulens.groundedness_error",
-                    extra={"idx": i, "error": str(exc)},
-                )
-                g = float("nan")
-            try:
-                r = float(relevance(q, a))
-            except Exception as exc:  # pragma: no cover
-                logger.warning(
-                    "rag.trulens.relevance_error",
-                    extra={"idx": i, "error": str(exc)},
-                )
-                r = float("nan")
-            rows.append({"idx": i, "groundedness": g, "answer_relevance": r})
-        return pl.DataFrame(rows)
+    # Note: A `trulens_scores()` method previously routed groundedness and
+    # answer-relevance through trulens-eval + OpenAI. It was removed in the
+    # 2026-04-20 sync because:
+    #   1. trulens-dashboard pins psutil<6, blocking kailash>=2.8.9 (psutil>=7).
+    #   2. The implementation routed through OpenAI, BLOCKED by Redline 14
+    #      (M6 is Ollama-only).
+    # Equivalent metrics (faithfulness + answer relevance) remain available via
+    # `ragas_scores()` above, which uses the M6-mandated Ollama provider.
 
     # ── DataFrames ─────────────────────────────────────────────────────
 

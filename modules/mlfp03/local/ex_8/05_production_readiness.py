@@ -238,6 +238,37 @@ print(f"  Sector total (DBS + OCBC + UOB):     S${sector_total:>12,.0f}/yr")
 
 
 # ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This capstone wired conformal prediction, drift monitoring, model
+# cards, deployment pipelines, and quantitative readiness gates from
+# primitives. The kailash-ml SDK packages the diagnostic surface (per-class
+# metrics, class-balance severity, confusion matrix) into a single call —
+# the foundation every production readiness gate audits against.
+#
+# Destination-first: when the journey is internalised, the SDK is one line.
+
+from kailash_ml import diagnose
+
+# `kind="classical_classifier"` dispatches to the sklearn ClassifierMixin
+# adapter. The capstone's calibrated_model implements the interface.
+report = diagnose(
+    calibrated_model,
+    kind="classical_classifier",
+    data=(X_test, y_test),
+    show=False,
+)
+print()
+print("  km.diagnose model    : capstone calibrated credit-default classifier")
+print(f"  km.diagnose metrics  : {report.metrics}")
+print(f"  km.diagnose severity : {report.severity}")
+print()
+print("km.diagnose: 1 call -> the diagnostic surface every readiness gate")
+print("audits against. Destination-first: when the journey is internalised,")
+print("the SDK is one line.")
+
+
+# ════════════════════════════════════════════════════════════════════════
 # REFLECTION — Module 3 Capstone
 # ════════════════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)

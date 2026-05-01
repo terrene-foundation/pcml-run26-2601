@@ -41,7 +41,7 @@ from shared.mlfp03.ex_8 import (
     train_calibrated_model,
 )
 
-from kailash_ml.engines.drift_monitor import DriftSpec
+from kailash_ml import DriftSpec
 
 
 # ════════════════════════════════════════════════════════════════════════

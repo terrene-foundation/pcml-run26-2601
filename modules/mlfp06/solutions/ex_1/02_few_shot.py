@@ -93,7 +93,7 @@ FEW_SHOT_EXAMPLES = [
 
 
 async def few_shot_classify(text: str) -> tuple[str, float, float]:
-    """Classify sentiment with 4 curated examples. Returns (label, cost, elapsed)."""
+    """Classify sentiment with 4 curated examples. Returns (label, tokens, elapsed)."""
     examples_text = "\n".join(
         f'Review: "{ex["text"]}"\nSentiment: {ex["category"]}\n'
         for ex in FEW_SHOT_EXAMPLES
@@ -105,8 +105,8 @@ Now classify:
 Review: "{text[:800]}"
 Sentiment:"""
 
-    response, cost, elapsed = await run_delegate(prompt)
-    return normalise_label(response), cost, elapsed
+    response, tokens, elapsed = await run_delegate(prompt)
+    return normalise_label(response), tokens, elapsed
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -120,7 +120,7 @@ async def evaluate() -> list[dict]:
     for i, (text, true_label) in enumerate(
         zip(docs["text"].to_list(), docs["label"].to_list())
     ):
-        pred, cost, elapsed = await few_shot_classify(text)
+        pred, tokens, elapsed = await few_shot_classify(text)
         correct = pred == true_label
         results.append(
             {
@@ -128,7 +128,7 @@ async def evaluate() -> list[dict]:
                 "pred": pred,
                 "true": true_label,
                 "correct": correct,
-                "cost": cost,
+                "tokens": tokens,
                 "elapsed": elapsed,
             }
         )
@@ -163,7 +163,7 @@ print_summary(few_shot_results, "Few-Shot (4 examples)")
 zero_shot_expected = {
     "strategy": "Zero-Shot",
     "accuracy": 0.80,
-    "total_cost": 0.002,
+    "total_tokens": 1500,
     "avg_latency_s": 1.0,
     "n": 20,
 }

@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 from kaizen import InputField, OutputField, Signature
 from kaizen.core.base_agent import BaseAgent
 
+from shared.mlfp06._ollama_bootstrap import OLLAMA_BASE_URL
 from shared.mlfp06.ex_5 import (
     MODEL,
     OUTPUT_DIR,
@@ -135,7 +136,9 @@ class RefinedAnalysisSignature(Signature):
 
 @dataclass
 class DataAnalysisConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = os.environ.get("LLM_PROVIDER", "ollama")
+
+    base_url: str = os.environ.get("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
     model: str = MODEL  # resolved from .env
     temperature: float = 0.2
     budget_limit_usd: float = 1.0
@@ -143,7 +146,9 @@ class DataAnalysisConfig:
 
 @dataclass
 class CriticConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = os.environ.get("LLM_PROVIDER", "ollama")
+
+    base_url: str = os.environ.get("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
     model: str = MODEL
     temperature: float = 0.2
     budget_limit_usd: float = 1.0
@@ -151,7 +156,9 @@ class CriticConfig:
 
 @dataclass
 class RefinedAnalysisConfig:
-    llm_provider: str = os.environ.get("LLM_PROVIDER", "openai")
+    llm_provider: str = os.environ.get("LLM_PROVIDER", "ollama")
+
+    base_url: str = os.environ.get("OLLAMA_BASE_URL", OLLAMA_BASE_URL)
     model: str = MODEL
     temperature: float = 0.2
     budget_limit_usd: float = 1.0

@@ -264,7 +264,7 @@ bert_val_loader = DataLoader(
 async def train_bert_async(model, train_loader, val_loader, epochs=3, lr=2e-5):
     # TODO: Implement BERT training loop with ExperimentTracker
     # Hint: optimizer = AdamW, scheduler = LinearLR
-    # Hint: async with tracker.run(...) as ctx: log params, train loop, log metrics
+    # Hint: async with tracker.track(...) as run: log params, train loop, log metrics
     optimizer = ...  # YOUR CODE HERE — AdamW with trainable params only
     scheduler = torch.optim.lr_scheduler.LinearLR(
         optimizer,
@@ -275,8 +275,8 @@ async def train_bert_async(model, train_loader, val_loader, epochs=3, lr=2e-5):
     train_losses, val_accs = [], []
     best_acc = 0.0
 
-    async with tracker.run(experiment_name=exp_name, run_name="bert_finetune") as ctx:
-        await ctx.log_params(
+    async with tracker.track(experiment=exp_name, run_name="bert_finetune") as run:
+        await run.log_params(
             {
                 "model_type": "bert_finetune",
                 "base_model": BERT_MODEL_NAME,
@@ -314,7 +314,7 @@ async def train_bert_async(model, train_loader, val_loader, epochs=3, lr=2e-5):
                 acc = correct / total_count
                 val_accs.append(acc)
 
-            await ctx.log_metrics(
+            await run.log_metrics(
                 {"train_loss": epoch_loss, "val_accuracy": acc}, step=epoch + 1
             )
             if acc > best_acc:
@@ -323,7 +323,7 @@ async def train_bert_async(model, train_loader, val_loader, epochs=3, lr=2e-5):
                 f"  [BERT] epoch {epoch+1}/{epochs}  loss={epoch_loss:.4f}  val_acc={acc:.3f}"
             )
 
-        await ctx.log_metrics(
+        await run.log_metrics(
             {"best_val_accuracy": best_acc, "final_train_loss": train_losses[-1]}
         )
     return train_losses, val_accs
@@ -581,27 +581,17 @@ print(
 # ══════════════════════════════════════════════════════════════════
 # DIAGNOSTIC CHECKPOINT — comparative Prescription Pad for all 3
 # ══════════════════════════════════════════════════════════════════
-from shared.mlfp05.diagnostics import diagnose_classifier, run_diagnostic_checkpoint
+from kailash_ml.diagnostics import run_diagnostic_checkpoint
+from kailash_ml import diagnose
 
 print("\n── Diagnostic Report (LSTM) ──")
-lstm_diag, lstm_findings = diagnose_classifier(
-    lstm_model,
-    val_loader,
-    title="LSTM (3-way comparison)",
-    n_batches=6,
-    train_losses=lstm_losses,
-    val_losses=[1.0 - a for a in lstm_accs],
-    show=False,
-)
+report = diagnose(lstm_model, kind="dl", data=val_loader, show=False)
 
 print("\n── Diagnostic Report (Transformer) ──")
-tfm_diag, tfm_findings = diagnose_classifier(
+report = diagnose(
     transformer_model,
-    val_loader,
-    title="Transformer (3-way comparison)",
-    n_batches=6,
-    train_losses=transformer_losses,
-    val_losses=[1.0 - a for a in transformer_accs],
+    kind="dl",
+    data=val_loader,
     show=False,
 )
 
@@ -912,6 +902,31 @@ print("Attention heatmap saved to ex_4_5_attention_heatmap.html")
 assert attn_np.shape[0] == MAX_LEN, "Attention heatmap should cover full sequence"
 assert Path("ex_4_5_attention_heatmap.html").exists(), "Heatmap should be saved"
 print("\n--- Checkpoint 5 passed --- visualisations complete\n")
+
+
+# ════════════════════════════════════════════════════════════════════════
+# DESTINATION-FIRST CLOSE — km.diagnose
+# ════════════════════════════════════════════════════════════════════════
+# This lesson walked the journey of attention-based language models —
+# from-scratch self-attention, transformer encoder, LSTM baseline, and
+# BERT fine-tuning. The kailash-ml SDK ships a single-call diagnostic
+# primitive that closes the production loop: km.diagnose inspects a
+# trained model and emits an auto-dashboard (loss curves, gradient flow,
+# dead neurons, activation stats, weight distributions). One cell.
+# Every diagnostic students would otherwise hand-roll, ready to surface
+# in a Plotly dashboard.
+
+from kailash_ml import diagnose
+
+# We diagnose the from-scratch transformer (val_loader yields token-id
+# tensors compatible with its forward signature). `kind='auto'` dispatches
+# by model type — DLDiagnostics for torch.nn.Module.
+report = diagnose(transformer_model, kind="auto", data=val_loader, show=False)
+report.plot_training_dashboard()
+print()
+print("km.diagnose: 1 line of code -> the same observability the lesson")
+print("body hand-rolled in 200+ lines. This is what 'destination-first'")
+print("means — when the journey is internalised, the SDK is one call.")
 
 
 # ══════════════════════════════════════════════════════════════════════

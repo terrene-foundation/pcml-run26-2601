@@ -32,8 +32,7 @@ import time
 
 import matplotlib.pyplot as plt
 import polars as pl
-from kaizen_agents import Delegate
-
+from shared.mlfp06._ollama_bootstrap import make_delegate, run_delegate_text
 from shared.mlfp06.ex_6 import (
     MODEL,
     OUTPUT_DIR,
@@ -267,9 +266,9 @@ print("=" * 70)
 
 async def single_agent_analysis(doc: str, question: str) -> dict:
     """Run a single Delegate on the whole task."""
-    # Delegate's budget parameter renamed: max_llm_cost_usd -> budget_usd
-    # in kaizen_agents 0.9.x.  See workspaces/mlfp06-migration/api-cheatsheet.md
-    delegate = Delegate(model=MODEL, budget_usd=3.0)
+    # M6 Ollama migration: route through the bootstrap factory so the local
+    # Ollama daemon backs the call (no API keys, no silent OpenAI fallback).
+    delegate = make_delegate(model=MODEL)
     t0 = time.perf_counter()
     prompt = (
         "Analyse this passage and answer the question.\n"
@@ -278,13 +277,7 @@ async def single_agent_analysis(doc: str, question: str) -> dict:
         f"Question: {question}\n\n"
         "Provide a comprehensive answer:"
     )
-    response = ""
-    async for event in delegate.run(prompt):
-        # kaizen_agents 0.9: text lives on TextDelta / TurnComplete
-        # subclasses, not on the DelegateEvent base class.
-        text_chunk = getattr(event, "text", None)
-        if text_chunk:
-            response += text_chunk
+    response, *_ = await run_delegate_text(delegate, prompt)
     return {
         "answer": response.strip(),
         "latency_s": time.perf_counter() - t0,

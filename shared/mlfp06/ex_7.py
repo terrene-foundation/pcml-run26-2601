@@ -58,7 +58,9 @@ CLEARANCE_LEVELS: dict[str, int] = {
 
 # Default LLM (lazy-resolved; agents read at construction time)
 def default_model_name() -> str | None:
-    return os.environ.get("DEFAULT_LLM_MODEL", os.environ.get("OPENAI_PROD_MODEL"))
+    from shared.mlfp06._ollama_bootstrap import DEFAULT_CHAT_MODEL
+
+    return DEFAULT_CHAT_MODEL
 
 
 # ════════════════════════════════════════════════════════════════════════

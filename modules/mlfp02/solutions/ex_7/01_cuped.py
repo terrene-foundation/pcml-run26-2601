@@ -36,7 +36,7 @@ import asyncio
 import numpy as np
 import plotly.graph_objects as go
 from kailash.db import ConnectionManager
-from kailash_ml.engines.experiment_tracker import ExperimentTracker
+from kailash_ml import ExperimentTracker
 
 from shared.mlfp02.ex_7 import (
     OUTPUT_DIR,
@@ -312,18 +312,14 @@ print(f"Estimated annual savings: S${savings:,.0f}")
 
 
 async def log_cuped_results():
-    conn = ConnectionManager("sqlite:///mlfp02_experiments.db")
+    db = "sqlite:///mlfp02_experiments.db"
+    tracker = await ExperimentTracker.create(store_url=db)
+    conn = ConnectionManager(db)
     await conn.initialize()
-    tracker = ExperimentTracker(conn)
-    await tracker.initialize()
 
-    exp_id = await tracker.create_experiment(
-        name="mlfp02_ex7_cuped",
-        description="CUPED variance reduction analysis",
-        tags=["mlfp02", "cuped", "variance-reduction"],
-    )
+    exp_id = "mlfp02_ex7_cuped"
 
-    async with tracker.run(exp_id, run_name="cuped_analysis") as run:
+    async with tracker.track(experiment=exp_id, run_name="cuped_analysis") as run:
         await run.log_params(
             {
                 "cuped_covariate": "pre_metric_value",
